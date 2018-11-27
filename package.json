@@ -1,0 +1,20 @@
+{
+  "name": "discord-bot",
+  "version": "1.0.0",
+  "description": "Just a simple discord bot",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^5.0.1",
+    "discord.js": "^11.4.2",
+    "fs": "0.0.1-security",
+    "mathjs": "^4.4.2",
+    "npm": "^5.10.0",
+    "request": "^2.88.0",
+    "winston": "^2.4.4"
+  }
+}
