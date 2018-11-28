@@ -10,17 +10,32 @@ client.on('ready', function () {
 	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'mainDb';").get();
 	if (!table['count(*)']) {
 		// If the table isn't there, create it and setup the database correctly.
-		sql.prepare("CREATE TABLE mainDb (id TEXT PRIMARY KEY, user TEXT, points INTEGER, level INTEGER, currency INTEGER, total_messages_sent INTEGER);").run();
+		sql.prepare("CREATE TABLE mainDb (id TEXT PRIMARY KEY, user TEXT, last_known_displayName TEXT, points INTEGER, level INTEGER, currency INTEGER, total_messages_sent INTEGER);").run();
 		// Ensure that the "id" row is always unique and indexed.
 		sql.prepare("CREATE UNIQUE INDEX idx_mainDb_id ON mainDb (id);").run();
 		sql.pragma("synchronous = 1");
-		sql.pragma("journal_mode = wal");
+	}
+	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'cooldownDb';").get();
+	if (!table['count(*)']) {
+		// If the table isn't there, create it and setup the database correctly.
+		sql.prepare("CREATE TABLE cooldownDb (id TEXT PRIMARY KEY, user TEXT, command TEXT, lastUsed INTEGER);").run();
+		// Ensure that the "id" row is always unique and indexed.
+		sql.prepare("CREATE UNIQUE INDEX idx_cooldownDb_id ON cooldownDb (id);").run();
+		sql.pragma("synchronous = 1");
 	}
 	// And then we have two prepared statements to get and set the score data.
 	client.getScore = sql.prepare("SELECT * FROM mainDb WHERE user = ?");
-	client.setScore = sql.prepare("INSERT OR REPLACE INTO mainDb (id, user, points, level, currency, total_messages_sent) VALUES (@id, @user, @points, @level, @currency, @total_messages_sent);");
+	client.setScore = sql.prepare("INSERT OR REPLACE INTO mainDb (id, user, last_known_displayName,  points, level, currency, total_messages_sent) VALUES (@id, @user, @last_known_displayName, @points, @level, @currency, @total_messages_sent);");
+	client.getCooldown = sql.prepare("SELECT * FROM cooldownDb WHERE user = ? AND command = ?;");
+	client.setCooldown = sql.prepare("INSERT OR REPLACE INTO cooldownDb (id, user, command, lastUsed) VALUES (NULL, @user, @command, @lastUsed);");
 
 	console.log('Ready and logged in as ' + client.user.username + '!');
+	client.user.setPresence({
+		game: {
+			name: 'you. ;)',
+			type: 'WATCHING'
+		}
+	})
 });
 
 client.on('warn', warn => {
@@ -30,25 +45,7 @@ client.on('warn', warn => {
 client.on('message', message => {
 	if (message.author.bot)
 		return;
-	var dbGet = client.getScore.get(message.author.id);
-	currentTime = Math.floor(Date.now() / 1000);
-	if (!dbGet) {
-		console.log(`User ${message.member.displayName} does not currently have an entry in the DB. Making one now`);
-		dbGet = {
-			id: `${message.author.id}_${currentTime}`,
-			user: message.author.id,
-			points: 0,
-			level: 1,
-			currency: 0,
-			total_messages_sent: 0
-		}
-		console.log("Should have created a DB entry for user " + message.member.displayName);
-	}
-	dbGet.points++
-	dbGet.currency++
-	dbGet.total_messages_sent++
-	
-	var curLevel = Math.floor(0.1 * Math.sqrt(dbGet.points));
+	var wordsInMessage = message.content.split(" ");
 	var lul = message.guild.emojis.find(emoji => emoji.name.toLowerCase() == "lul");
 	var pogchamp = message.guild.emojis.find(emoji => emoji.name.toLowerCase() == "pogchamp");
 	var cachedStorage = JSON.parse(JSON.stringify(storage));
@@ -56,20 +53,106 @@ client.on('message', message => {
 		["lul", lul, storage.counters.luls],
 		["pogchamp", pogchamp, storage.counters.pogs],
 	];
-	var wordsInMessage = message.content.split(" ");
+	var listOfActions = [
+		["mine", "chop", "fish", "hunt"],
+	];
+	var listOfActionsAsString = "";
+	
+	var dbGet = client.getScore.get(message.author.id);
+	currentTime = Math.floor(Date.now() / 1000);
+	if (!dbGet) {
+		console.log(`User ${message.member.displayName} does not currently have an entry in the DB. Making one now`);
+		dbGet = {
+			id: `${message.author.id}_${currentTime}`,
+			user: message.author.id,
+			last_known_displayName: message.member.displayName,
+			points: 0,
+			level: 1,
+			currency: 0,
+			total_messages_sent: 0
+		}
+		console.log("Should have created a DB entry for user " + message.member.displayName);
+	}
+
+	if (!message.content.startsWith(config.prefix)) {
+		var randNum = Math.floor(Math.random() * 11);
+		dbGet.points += randNum
+		dbGet.currency += randNum
+		dbGet.total_messages_sent++
+		dbGet.last_known_displayName = message.member.displayName;
+	}
+
+	if (message.content.toLowerCase().startsWith(config.prefix + "action")) {
+		var actionC = "";
+		for (var i = 0; i < listOfActions[0].length; i++) {
+			if (listOfActions[0][i] == wordsInMessage[1]) {
+				actionC = listOfActions[0][i];
+			}
+			var actionCs = listOfActions[0][i];
+			if (i != listOfActions.length - 1) {
+				listOfCountersAsString += actionCs + ", ";
+			} else {
+				listOfCountersAsString += actionCs;
+			}
+		}
+		if (actionC != "") {
+			var cooldownGet = client.getCooldown.get(message.author.id, actionC);
+			if (!cooldownGet) {
+				console.log(`User ${message.member.displayName} does not currently have an entry in the Cooldown DB. Making one now`);
+				cooldownGet = {
+					id: `${message.author.id}_${currentTime}`,
+					user: message.author.id,
+					command: `${actionC}`,
+					lastUsed: `${currentTime}`
+				}
+				console.log("Should have created a Cooldown DB entry for user " + message.member.displayName);
+			}
+			var randNum = Math.floor(Math.random() * 101);
+			if (cooldownGet.lastUsed < currentTime + 300 || cooldownGet.lastUsed == null) {
+				dbGet.points += randNum;
+				dbGet.currency += randNum;
+				cooldownGet.lastUsed = currentTime;
+				message.channel.send(`You used '${actionC}' and gained ${randNum} points!`);
+
+			} else {
+				message.channel.send(`You must wait ${cooldownGet.lastUsed - currentTime} seconds before using that command again!`);
+			}
+			client.setCooldown.run(cooldownGet);
+		} else {
+			message.channel.send("Unknown action. Available actions are: " + listOfActionsAsString + ". `SYNTAX: " + config.prefix + "action [action]`");
+		}
+	}
 
 	if (message.content.toLowerCase().startsWith(config.prefix + 'admin') && message.author.id == 197376829408018432) {
-		if (wordsInMessage[1] == "givepoints"){
-			dbGet.points += parseInt(wordsInMessage[2]);
+		dbGet = client.getScore.get(message.mentions.users.first().id);
+		if (!dbGet) {
+			console.log(`User ${message.mentions.users.first().displayName} does not currently have an entry in the DB. Making one now`);
+			dbGet = {
+				id: `${message.mentions.users.first().id}_${currentTime}`,
+				user: message.mentions.users.first().id,
+				last_known_displayName: message.mentions.users.first().displayName,
+				points: 0,
+				level: 1,
+				currency: 0,
+				total_messages_sent: 0
+			}
+			console.log("Should have created a DB entry for user " + message.mentions.users.first().displayName);
+		}
+		if (wordsInMessage[2] == "givepoints") {
+			dbGet.points += parseInt(wordsInMessage[3]);
+		} else if (wordsInMessage[2] == "setpoints") {
+			dbGet.points = parseInt(wordsInMessage[3]);
+		} else if (wordsInMessage[2] == "setlevel") {
+			dbGet.level = parseInt(wordsInMessage[3]);
 		} else {
 			message.channel.send("Invalid arguments!");
 		}
 	}
-	
-	if (message.content.toLowerCase().startsWith(config.prefix + 'stats')){
-		message.channel.send(`You currently have ${dbGet.points} and are Level ${dbGet.level}!`);
+	var curLevel = dbGet.points / 10;
+	if (message.content.toLowerCase().startsWith(config.prefix + 'stats')) {
+		message.channel.send(`You currently have ${dbGet.points} points and are Level ${dbGet.level}!`);
 	}
-	
+
 	for (var word in wordsInMessage) {
 		//console.log(wordsInMessage[word]);
 		for (var i = 0; i < listOfCounters.length; i++) {
@@ -118,12 +201,12 @@ client.on('message', message => {
 	if (message.content.toLowerCase().startsWith('>tfw') || message.content.toLowerCase().startsWith('tfw')) {
 		message.channel.send('feels bad man :(')
 	}
-	
+
 	if (dbGet.level < curLevel) {
 		dbGet.level++
-		message.reply(`Well done you leveled up! You are now Level ${dbGet.level} with ${dbGet.points} points!`);
+		//message.react("🌟");
 	}
-	
+
 	client.setScore.run(dbGet);
 
 	if (JSON.stringify(cachedStorage) != JSON.stringify(storage)) {
