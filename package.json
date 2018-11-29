@@ -9,6 +9,7 @@
 	"author": "Renny",
 	"license": "ISC",
 	"dependencies": {
+		"better-sqlite-pool": "^0.1.2",
 		"better-sqlite3": "^5.0.1",
 		"discord.js": "^11.4.2",
 		"fs": "0.0.1-security",
