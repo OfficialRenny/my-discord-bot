@@ -2,11 +2,39 @@ const Discord = require('discord.js');
 const client = new Discord.Client();
 const SQLite = require("better-sqlite3");
 const fs = require('fs');
+const log4js = require('log4js');
+var seedrandom = require('seedrandom');
+
 const config = require('./data/config.json');
 var storage = JSON.parse(fs.readFileSync('./data/storage.json', 'utf8'));
 var sql = new SQLite('./data/db.sqlite');
 const usedActionRecently = new Set();
 const adminID = 197376829408018432;
+
+log4js.configure({
+	appenders: {
+		consoleLogs: {
+			type: 'file',
+			filename: './data/logs/consoleLogs.log'
+		},
+		console: {
+			type: 'console'
+		}
+	},
+	categories: {
+	default: {
+			appenders: ['console', 'consoleLogs'],
+			level: 'trace'
+		}
+	}
+});
+
+var logger = log4js.getLogger();
+
+var listOfStoreItems = [
+	["discord_silver", "silver", "Discord Silver", 500, "https://i.imgur.com/Vt7NLdA.png"],
+	["rick_roll", "rick", "Rick Roll", 100, "https://media.giphy.com/media/Vuw9m5wXviFIQ/giphy.gif"]
+];
 
 client.on('ready', function () {
 	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'mainDb';").get();
@@ -26,14 +54,33 @@ client.on('ready', function () {
 		sql.prepare("CREATE UNIQUE INDEX idx_prefixDb_id ON prefixDb (id);").run();
 		sql.pragma("synchronous = 1");
 	}
+
+	var arrayOfDBColumns = sql.prepare("PRAGMA table_info(mainDb);").all();
+	var allColumns = [];
+	var allColumnsValues = [];
+
+	for (i = 0; i < arrayOfDBColumns.length; i++) {
+		allColumns.push(arrayOfDBColumns[i].name);
+	}
+
+	for (i = 0; i < listOfStoreItems.length; i++) {
+		if (!allColumns.includes(listOfStoreItems[i][0])) {
+			sql.prepare(`ALTER TABLE mainDb ADD COLUMN ${listOfStoreItems[i][0]} INTEGER DEFAULT 0;`).run();
+		}
+	}
+
+	for (i = 0; i < allColumns.length; i++) {
+		allColumnsValues.push(`@${allColumns[i]}`);
+	}
+
 	// And then we have two prepared statements to get and set the score data.
 	client.getScore = sql.prepare("SELECT * FROM mainDb WHERE user = ?");
-	client.setScore = sql.prepare("INSERT OR REPLACE INTO mainDb (id, user, last_known_displayName,  points, level, currency, total_messages_sent, discord_silver) VALUES (@id, @user, @last_known_displayName, @points, @level, @currency, @total_messages_sent, @discord_silver);");
+	client.setScore = sql.prepare(`INSERT OR REPLACE INTO mainDb (${allColumns.toString()}) VALUES (${allColumnsValues.toString()});`);
 
 	client.getPrefix = sql.prepare("SELECT * FROM prefixDb WHERE id = ?");
 	client.setPrefix = sql.prepare("INSERT OR REPLACE INTO prefixDb (id, prefix) VALUES (@id, @prefix);");
 
-	console.log('Ready and logged in as ' + client.user.username + '!');
+	logger.info('Ready and logged in as ' + client.user.username + '!');
 	client.user.setPresence({
 		game: {
 			name: 'you. ;)',
@@ -43,29 +90,27 @@ client.on('ready', function () {
 });
 
 client.on('warn', warn => {
-	console.log(info);
+	logger.info(info);
 });
 
 client.on('message', async(message) => {
-
-	fs.appendFile(`./data/${message.guild.name}-log.txt`, `${new Date().toUTCString()} - ${message.author.username} - "${message.content}"\n`, (err) => {
+	if (message.author.bot || !message.guild)
+		return;
+	fs.appendFile(`./data/logs/${message.guild.name}-log.txt`, `${new Date().toUTCString()} - ${message.author.username} in #${message.channel.name} - "${message.content}"\n`, (err) => {
 		if (err)
 			throw err;
 	});
-
-	if (message.author.bot || !message.guild)
-		return;
 	var alreadyLevelledUp = false;
 
 	var prefixGet = client.getPrefix.get(message.guild.id);
 	if (!prefixGet) {
-		console.log(`Guild ${message.guild.name} does not yet have a prefix, defaulting to ~.`);
+		logger.info(`Guild ${message.guild.name} does not yet have a prefix, defaulting to ~.`);
 		prefixGet = {
 			id: `${message.guild.id}`,
 			prefix: "~"
 		}
 		client.setPrefix.run(prefixGet);
-		console.log("Done.");
+		logger.info("Done.");
 	}
 
 	var wordsInMessage = message.content.split(" ");
@@ -77,41 +122,25 @@ client.on('message', async(message) => {
 		["pogchamp", pogchamp, storage.counters.pogs]
 	];
 	var listOfActions =
-		["mine", "chop", "fish", "hunt"];
+		["mine", "chop", "fish", "hunt", "dig"];
 	var listOfActionsAsString = "";
 
 	var dbGet = client.getScore.get(message.author.id);
 	var currentTime = Math.floor(Date.now() / 1000);
 	if (!dbGet) {
-		console.log(`User ${message.member.displayName} does not currently have an entry in the DB. Making one now`);
-		dbGet = {
-			id: `${message.author.id}_${currentTime}`,
-			user: message.author.id,
-			last_known_displayName: message.member.displayName,
-			points: 0,
-			level: 1,
-			currency: 0,
-			total_messages_sent: 0,
-			discord_silver: 1
-		}
-		console.log("Should have created a DB entry for user " + message.member.displayName);
+		dbGet = generateDbEntry(message.author);
 	}
-		
-	var silver = dbGet.discord_silver;
-	var listOfStoreItems = [
-		["discord_silver", "silver", "Discord Silver", 500, "https://i.imgur.com/Vt7NLdA.png"]
-	];
 
-	if (!message.content.startsWith(prefixGet.prefix)) {
-		var randNum = Math.floor(Math.random() * 11);
-		dbGet.points += randNum
-		dbGet.currency += randNum
-		dbGet.total_messages_sent++
-		dbGet.last_known_displayName = message.member.displayName;
+	{
+		let randNum = Math.floor(Math.random() * 11);
+		dbGet.points++;
+		dbGet.currency += randNum;
+		dbGet.total_messages_sent++;
+		dbGet.last_known_displayName = message.member.nickname;
 	}
 
 	for (var word in wordsInMessage) {
-		//console.log(wordsInMessage[word]);
+		//logger.info(wordsInMessage[word]);
 		for (var i = 0; i < listOfCounters.length; i++) {
 			if (wordsInMessage[word] == listOfCounters[i][0]) {
 				listOfCounters[i][2]++;
@@ -141,7 +170,7 @@ client.on('message', async(message) => {
 				var authorIDandAction = `${message.author.id}-${actionC}`;
 				var randNum = Math.floor(Math.random() * 101);
 				if (!usedActionRecently.has(authorIDandAction)) {
-					dbGet.points += randNum;
+					dbGet.points += 2;
 					dbGet.currency += randNum;
 					message.channel.send(`You used '${actionC}' and gained ${randNum}:money_with_wings:!`);
 
@@ -149,74 +178,13 @@ client.on('message', async(message) => {
 					setTimeout(() => {
 						usedActionRecently.delete(authorIDandAction);
 					}, 60000 * 2);
-					console.log(`${message.author.username} used ${actionC} and got a score of ${randNum}`);
+					logger.info(`${message.author.username} used ${actionC} and got a score of ${randNum}`);
 				} else {
 					message.channel.send(`You must wait 2 minutes before using that command again!`);
 				}
 			} else {
 				message.channel.send("Unknown action. Available actions are: " + listOfActionsAsString + ". `SYNTAX: " + prefixGet.prefix + "action [action]`");
 			}
-		}
-
-		if (command == 'admin' && message.author.id == adminID) {
-			var adminCmds =
-				["givepoints", "setpoints", "setlevel", "setcurrency", "givesilver", "setsilver"];
-			var validCmd = true;
-			var usableId;
-			if (!message.mentions.users.first()) {
-				usableId = message.author;
-			} else {
-				usableId = message.mentions.users.first();
-			}
-			dbGet = client.getScore.get(usableId.id);
-			if (!dbGet) {
-					dbGet = generateDbEntry(usableId);
-				}
-			var listOfAdminCmds = "";
-			for (var i = 0; i < adminCmds.length; i++) {
-				var adminCmdC = adminCmds[i];
-				if (i != adminCmds.length - 1) {
-					listOfAdminCmds += adminCmdC + ", ";
-				} else {
-					listOfAdminCmds += adminCmdC;
-				}
-			}
-			if (message.content.match(/\d+/) != null) {
-				var firstNumber = message.content.match(/\d+/).shift();
-			} else {
-				return message.channel.send("Invalid command! List of commands: " + listOfAdminCmds + ". `SYNTAX: " + prefixGet.prefix + "admin [mention, if any] [command] [value]`");
-			}
-			for (var l = 0; l < args.length; l++) {
-				if (args[l] == "givepoints") {
-					dbGet.points += parseInt(firstNumber);
-					message.channel.send("Giving " + parseInt(firstNumber) + " points to " + usableId.username + ".");
-					break;
-				} else if (args[l] == "setpoints") {
-					dbGet.points = parseInt(firstNumber);
-					message.channel.send("Setting points to " + parseInt(firstNumber) + " for " + usableId.username + ".");
-					break;
-				} else if (args[l] == "setlevel") {
-					dbGet.level = parseInt(firstNumber);
-					message.channel.send("Setting level to " + parseInt(firstNumber) + " for " + usableId.username + ".");
-					break;
-				} else if (args[l] == "setcurrency") {
-					dbGet.currency = parseInt(firstNumber);
-					message.channel.send("Setting :money_with_wings: to " + parseInt(firstNumber) + " for " + usableId.username + ".");
-					break;
-				} else if (args[l] == "givesilver") {
-					dbGet.discord_silver += parseInt(firstNumber);
-					message.channel.send("Giving " + parseInt(firstNumber) + " Silver to " + usableId.username + ".");
-					break;
-				} else if (args[l] == "setsilver") {
-					dbGet.discord_silver = parseInt(firstNumber);
-					message.channel.send("Setting Silver to " + parseInt(firstNumber) + " for " + usableId.username + ".");
-					break;
-				}
-				message.channel.send("Invalid command! List of commands: " + listOfAdminCmds + ". `SYNTAX: " + prefixGet.prefix + "admin [command] [value] [mention, if any]`");
-			}
-			var curLevel = dbGet.points / 10;
-			dbGet.level = Math.floor(curLevel);
-			alreadyLevelledUp = true;
 		}
 
 		if (command == 'stats') {
@@ -231,8 +199,8 @@ client.on('message', async(message) => {
 				dbGet = generateDbEntry(usableId);
 			}
 
-			var curLevel = dbGet.points / 10;
-			dbGet.level = Math.floor(curLevel);
+			
+			dbGet.level = Math.floor(calculateLevel(dbGet.points));
 			alreadyLevelledUp = true;
 
 			const embed = new Discord.RichEmbed()
@@ -243,9 +211,9 @@ client.on('message', async(message) => {
 				.setTitle(`Stats for ${usableId.username}`)
 				.addField("Level", dbGet.level, true)
 				.addField("XP", dbGet.points, true)
-				.addField("XP to next level", 10 - (dbGet.points - (Math.floor(curLevel) * 10)), true)
+				.addField("Progression To Next Level", `${(calculateLevel(dbGet.points) / (calculateLevel(dbGet.points) + 1) * 100).toFixed(2)}%`, true)
 				.addField("Currency", dbGet.currency)
-				.addField("Discord Silver", dbGet.discord_silver);
+				.addField("Inventory", `To see your inventory, please use ${prefixGet.prefix}inv`);
 			message.channel.send({
 				embed
 			});
@@ -318,9 +286,11 @@ client.on('message', async(message) => {
 				for (k = 0; k < listOfStoreItems.length; k++) {
 					if (args[0] == listOfStoreItems[k][1]) {
 						if ((listOfStoreItems[k][3] - 1) < dbGet.currency) {
+							dbGet.points += listOfStoreItems[k][3] / 100;
 							dbGet.currency -= listOfStoreItems[k][3];
 							dbGet[listOfStoreItems[k][0]]++;
 							message.reply(`thank you for buying a ${listOfStoreItems[k][2]}, your balance is now ${dbGet.currency}:money_with_wings:`);
+							break;
 						} else {
 							message.reply(`you do not have enough :money_with_wings: to purchase a ${listOfStoreItems[k][2]}.`);
 						}
@@ -332,29 +302,112 @@ client.on('message', async(message) => {
 			}
 		}
 
-		if (command == 'give-silver') {
+		if (command == 'give') {
+			if (message.mentions.users.first().id == client.user.id)
+				return message.channel.send("Oh.... no thanks, you can keep it! >.<");
 			if (!message.mentions.users.first())
-				return message.channel.send("You need to mention a user!");
-
-			if (dbGet.discord_silver > 0) {
-				dbGet.discord_silver--;
-				client.setScore.run(dbGet);
-				usableId = message.mentions.users.first();
-				dbGet = client.getScore.get(usableId.id);
-				if (!dbGet) {
-					dbGet = generateDbEntry(usableId);
+				return message.reply("you need to mention a user!");
+			let isAnItem = false;
+			for (i = 0; i < listOfStoreItems.length; i++) {
+				if (args[0] == listOfStoreItems[i][1]) {
+					isAnItem = true;
+					break;
+				} else {
+					isAnItem = false;
 				}
-				dbGet.discord_silver++;
-				client.setScore.run(dbGet);
-				const embed = new Discord.RichEmbed()
-					.setTimestamp()
-					.setAuthor(usableId.username)
-					.setDescription(`${message.mentions.users.first().username}, ${message.author.username} has just gifted you Discord Silver!`)
-					.setTitle(`You have a gift!`)
-					.setImage("https://i.imgur.com/Vt7NLdA.png");
-				message.channel.send({embed});
-			} else {
-				return message.channel.send("You do not have any silver to give, why not buy some from the store?");
+			}
+
+			if (!isAnItem)
+				return message.reply("this item does not exist or is not able to be given as a gift.");
+			
+			let usableId = message.mentions.users.first();
+			
+			for (i = 0; i < listOfStoreItems.length; i++) {
+				if (args[0] == listOfStoreItems[i][1]){
+				if (dbGet[listOfStoreItems[i][0]] > 0) {
+					dbGet[listOfStoreItems[i][0]]--;
+					client.setScore.run(dbGet);
+					dbGet = client.getScore.get(usableId.id);
+					if (!dbGet) {
+						dbGet = generateDbEntry(usableId);
+					}
+					dbGet[listOfStoreItems[i][0]]++;
+					client.setScore.run(dbGet);
+					logger.info(`User ${message.author.username} gave ${usableId.username} a ${listOfStoreItems[i][2]}!`);
+					const embed = new Discord.RichEmbed()
+						.setTimestamp()
+						.setAuthor(usableId.username)
+						.setDescription(`${message.mentions.users.first().username}, ${message.author.username} has just gifted you a ${listOfStoreItems[i][2]}!`)
+						.setTitle(`You have a gift!`)
+						.setImage(`${listOfStoreItems[i][4]}`);
+					return message.channel.send({
+						embed
+					});
+				} else {
+					return message.channel.send(`You do not have any ${listOfStoreItems[i][2]} to give, why not buy some from the store?`);
+				}}
+			}
+		}
+
+		if (command == 'inv') {
+			const embed = new Discord.RichEmbed()
+				.setTitle(message.author.username)
+				.setThumbnail(message.author.displayAvatarURL)
+				.setDescription("This is a list of all of your current items.")
+				.setFooter(`Your balance is ${dbGet.currency}`)
+				.setColor(0x406DA2);
+			for (k = 0; k < listOfStoreItems.length; k++) {
+				embed.addField(`${listOfStoreItems[k][2]}`, `${dbGet[listOfStoreItems[k][0]]}`, true);
+			}
+			message.channel.send({
+				embed
+			});
+		}
+		
+		if (command == 'initialise' && message.author.id == adminID) {
+			const arrayOfMembers = message.guild.members.array();
+			var membersString = "";
+			for(var guildMemberId in arrayOfMembers) {
+				if (arrayOfMembers[guildMemberId].user.bot)
+					continue;
+				
+				var dbGet = client.getScore.get(arrayOfMembers[guildMemberId].user.id);
+				if (!dbGet) {
+					dbGet = generateDbEntry(arrayOfMembers[guildMemberId].user);
+				}
+				membersString += arrayOfMembers[guildMemberId].user.username + '\n';
+			}
+			return message.channel.send(`Created database entries for users: \`\`\`${membersString}\`\`\``);
+		}
+	}
+
+	if (message.guild.id == 275388903547076610 || 256139176225931264) {
+
+		for (var i = 0; i < wordsInMessage.length; i++) {
+			if (wordsInMessage[i].toLowerCase() == "tra") {
+				message.channel.startTyping();
+				message.channel.send("tra");
+				message.channel.stopTyping();
+				return;
+			}
+
+			if (wordsInMessage[i].toLowerCase() == "ariana") {
+				message.channel.startTyping();
+				fileName = ariana4mogs(0, message.channel, message.author, message.guild);
+				message.channel.send({
+					file: fileName
+				});
+				message.channel.stopTyping();
+				return;
+			}
+			if (wordsInMessage[i].toLowerCase() == "monky") {
+				message.channel.startTyping();
+				fileName = ariana4mogs(1, message.channel, message.author, message.guild);
+				message.channel.send({
+					file: fileName
+				});
+				message.channel.stopTyping();
+				return;
 			}
 		}
 	}
@@ -364,7 +417,7 @@ client.on('message', async(message) => {
 	}
 
 	if (alreadyLevelledUp == false) {
-		dbGet.level = Math.floor(dbGet.points / 10);
+		dbGet.level = Math.floor(calculateLevel(dbGet.points));
 	}
 
 	client.setScore.run(dbGet);
@@ -372,28 +425,53 @@ client.on('message', async(message) => {
 	if (JSON.stringify(cachedStorage) != JSON.stringify(storage)) {
 		fs.writeFile('./storage.json', JSON.stringify(storage), (err) => {
 			if (err)
-				console.error(err)
+				logger.error(err)
 		});
 	}
 
 });
 
-function generateDbEntry (usableId) {
-		var currentTime = Math.floor(Date.now() / 1000);
-				console.log(`User ${usableId.username} does not currently have an entry in the DB. Making one now`);
-				var returnedDb;
-				returnedDb = {
-					id: `${usableId.id}_${currentTime}`,
-					user: usableId.id,
-					last_known_displayName: usableId.username,
-					points: 0,
-					level: 1,
-					currency: 0,
-					total_messages_sent: 0,
-					discord_silver: 1
-				}
-				console.log("Should have created a DB entry for user " + usableId.username);
-			return returnedDb;
+function generateDbEntry(usableId) {
+	var currentTime = Math.floor(Date.now() / 1000);
+	logger.info(`User ${usableId.username} does not currently have an entry in the DB. Making one now`);
+	var returnedDb;
+	returnedDb = {
+		id: `${usableId.id}_${currentTime}`,
+		user: usableId.id,
+		last_known_displayName: usableId.username,
+		points: 0,
+		level: 1,
+		currency: 0,
+		total_messages_sent: 0,
+		discord_silver: 0,
+		rick_roll: 0
+	}
+	logger.info("Should have created a DB entry for user " + usableId.username);
+	return returnedDb;
+}
+
+function calculateLevel (points) {
+	const currentLevel = 2*(Math.pow(points, 2/3)) - 1;
+	return currentLevel;
+}
+
+function ariana4mogs(type, channel, author, guild) {
+	var time = new Date().getTime();
+	var seed = (author.id * guild.id * time).toString();
+	var rng = seedrandom(seed);
+
+	if (type == 0) {
+		var path = './data/server-specifics/4mogs/';
+		var files = fs.readdirSync(path)
+			ranFile = files[Math.floor(rng() * files.length)]
+	}
+	if (type == 1) {
+		var path = './data/server-specifics/bumpics/';
+		var files = fs.readdirSync(path)
+			ranFile = files[Math.floor(rng() * files.length)]
+	}
+	logger.info(`Sending a file with the name of ${path + ranFile} to ${channel.name} in ${guild.name}, requested by ${author.username}. Seed: '${seed}'.`);
+	return path + ranFile;
 }
 
 client.login(config.token);
