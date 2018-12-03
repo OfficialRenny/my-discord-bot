@@ -15,7 +15,7 @@ log4js.configure({
 	appenders: {
 		consoleLogs: {
 			type: 'file',
-			filename: './data/logs/consoleLogs.log'
+			filename: './data/logs/console.log'
 		},
 		console: {
 			type: 'console'
@@ -29,14 +29,14 @@ log4js.configure({
 	}
 });
 
-var logger = log4js.getLogger();
+var logger = log4js.getLogger('default');
 
 var listOfStoreItems = [
 	["discord_silver", "silver", "Discord Silver", 500, "https://i.imgur.com/Vt7NLdA.png"],
 	["rick_roll", "rick", "Rick Roll", 100, "https://media.giphy.com/media/Vuw9m5wXviFIQ/giphy.gif"]
 ];
 
-client.on('ready', function () {
+client.on('ready', async() => {
 	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'mainDb';").get();
 	if (!table['count(*)']) {
 		// If the table isn't there, create it and setup the database correctly.
@@ -87,19 +87,13 @@ client.on('ready', function () {
 			type: 'WATCHING'
 		}
 	})
-});
 
-client.on('warn', warn => {
-	logger.info(info);
 });
 
 client.on('message', async(message) => {
 	if (message.author.bot || !message.guild)
 		return;
-	fs.appendFile(`./data/logs/${message.guild.name}-log.txt`, `${new Date().toUTCString()} - ${message.author.username} in #${message.channel.name} - "${message.content}"\n`, (err) => {
-		if (err)
-			throw err;
-	});
+	logger.trace(`${message.author.username} in "${message.guild.name} - #${message.channel.name}" said - "${message.content}"`);
 	var alreadyLevelledUp = false;
 
 	var prefixGet = client.getPrefix.get(message.guild.id);
@@ -130,13 +124,12 @@ client.on('message', async(message) => {
 	if (!dbGet) {
 		dbGet = generateDbEntry(message.author);
 	}
-
 	{
 		let randNum = Math.floor(Math.random() * 11);
 		dbGet.points++;
 		dbGet.currency += randNum;
 		dbGet.total_messages_sent++;
-		dbGet.last_known_displayName = message.member.nickname;
+		dbGet.last_known_displayName = message.member.displayName;
 	}
 
 	for (var word in wordsInMessage) {
@@ -199,7 +192,6 @@ client.on('message', async(message) => {
 				dbGet = generateDbEntry(usableId);
 			}
 
-			
 			dbGet.level = Math.floor(calculateLevel(dbGet.points));
 			alreadyLevelledUp = true;
 
@@ -279,26 +271,26 @@ client.on('message', async(message) => {
 				for (k = 0; k < listOfStoreItems.length; k++) {
 					embed.addField(`${listOfStoreItems[k][2]} - ${prefixGet.prefix}buy ${listOfStoreItems[k][1]}`, `${listOfStoreItems[k][3]}:money_with_wings:`);
 				}
-				message.channel.send({
+				return message.channel.send({
 					embed
 				});
 			} else {
-				for (k = 0; k < listOfStoreItems.length; k++) {
-					if (args[0] == listOfStoreItems[k][1]) {
-						if ((listOfStoreItems[k][3] - 1) < dbGet.currency) {
-							dbGet.points += listOfStoreItems[k][3] / 100;
-							dbGet.currency -= listOfStoreItems[k][3];
-							dbGet[listOfStoreItems[k][0]]++;
-							message.reply(`thank you for buying a ${listOfStoreItems[k][2]}, your balance is now ${dbGet.currency}:money_with_wings:`);
+				for (var item in listOfStoreItems) {
+					if (args[0] == listOfStoreItems[item][1]) {
+						if ((listOfStoreItems[item][3] - 1) < dbGet.currency) {
+							dbGet.points += listOfStoreItems[item][3] / 100;
+							dbGet.currency -= listOfStoreItems[item][3];
+							dbGet[listOfStoreItems[item][0]]++;
+							client.setScore.run(dbGet);
+							return message.reply(`thank you for buying a ${listOfStoreItems[item][2]}, your balance is now ${dbGet.currency}:money_with_wings:`);
 							break;
 						} else {
-							message.reply(`you do not have enough :money_with_wings: to purchase a ${listOfStoreItems[k][2]}.`);
+							return message.reply(`you do not have enough :money_with_wings: to purchase a ${listOfStoreItems[k][2]}.`);
 						}
 						break;
-					} else {
-						message.reply(`${args[0]} is not a valid item, please check \`${prefixGet.prefix}buy store\` for a list of all items.`);
 					}
 				}
+				return message.reply(`${args[0]} is not a valid item, please check \`${prefixGet.prefix}buy store\` for a list of all items.`);
 			}
 		}
 
@@ -319,33 +311,34 @@ client.on('message', async(message) => {
 
 			if (!isAnItem)
 				return message.reply("this item does not exist or is not able to be given as a gift.");
-			
+
 			let usableId = message.mentions.users.first();
-			
+
 			for (i = 0; i < listOfStoreItems.length; i++) {
-				if (args[0] == listOfStoreItems[i][1]){
-				if (dbGet[listOfStoreItems[i][0]] > 0) {
-					dbGet[listOfStoreItems[i][0]]--;
-					client.setScore.run(dbGet);
-					dbGet = client.getScore.get(usableId.id);
-					if (!dbGet) {
-						dbGet = generateDbEntry(usableId);
+				if (args[0] == listOfStoreItems[i][1]) {
+					if (dbGet[listOfStoreItems[i][0]] > 0) {
+						dbGet[listOfStoreItems[i][0]]--;
+						client.setScore.run(dbGet);
+						dbGet = client.getScore.get(usableId.id);
+						if (!dbGet) {
+							dbGet = generateDbEntry(usableId);
+						}
+						dbGet[listOfStoreItems[i][0]]++;
+						client.setScore.run(dbGet);
+						logger.info(`User ${message.author.username} gave ${usableId.username} a ${listOfStoreItems[i][2]}!`);
+						const embed = new Discord.RichEmbed()
+							.setTimestamp()
+							.setAuthor(usableId.username)
+							.setDescription(`${message.mentions.users.first().username}, ${message.author.username} has just gifted you a ${listOfStoreItems[i][2]}!`)
+							.setTitle(`You have a gift!`)
+							.setImage(`${listOfStoreItems[i][4]}`);
+						return message.channel.send({
+							embed
+						});
+					} else {
+						return message.channel.send(`You do not have any ${listOfStoreItems[i][2]} to give, why not buy some from the store?`);
 					}
-					dbGet[listOfStoreItems[i][0]]++;
-					client.setScore.run(dbGet);
-					logger.info(`User ${message.author.username} gave ${usableId.username} a ${listOfStoreItems[i][2]}!`);
-					const embed = new Discord.RichEmbed()
-						.setTimestamp()
-						.setAuthor(usableId.username)
-						.setDescription(`${message.mentions.users.first().username}, ${message.author.username} has just gifted you a ${listOfStoreItems[i][2]}!`)
-						.setTitle(`You have a gift!`)
-						.setImage(`${listOfStoreItems[i][4]}`);
-					return message.channel.send({
-						embed
-					});
-				} else {
-					return message.channel.send(`You do not have any ${listOfStoreItems[i][2]} to give, why not buy some from the store?`);
-				}}
+				}
 			}
 		}
 
@@ -363,19 +356,24 @@ client.on('message', async(message) => {
 				embed
 			});
 		}
-		
+
 		if (command == 'initialise' && message.author.id == adminID) {
 			const arrayOfMembers = message.guild.members.array();
 			var membersString = "";
-			for(var guildMemberId in arrayOfMembers) {
+			for (var guildMemberId in arrayOfMembers) {
 				if (arrayOfMembers[guildMemberId].user.bot)
 					continue;
-				
+
 				var dbGet = client.getScore.get(arrayOfMembers[guildMemberId].user.id);
 				if (!dbGet) {
 					dbGet = generateDbEntry(arrayOfMembers[guildMemberId].user);
+					client.setScore.run(dbGet);
+					membersString += arrayOfMembers[guildMemberId].user.username + '\n';
 				}
-				membersString += arrayOfMembers[guildMemberId].user.username + '\n';
+			}
+			if (membersString == "") {
+				logger.info(`Everyone in ${message.guild.name} already has an entry in the DB. Skipping....`);
+				return;
 			}
 			return message.channel.send(`Created database entries for users: \`\`\`${membersString}\`\`\``);
 		}
@@ -450,8 +448,8 @@ function generateDbEntry(usableId) {
 	return returnedDb;
 }
 
-function calculateLevel (points) {
-	const currentLevel = 2*(Math.pow(points, 2/3)) - 1;
+function calculateLevel(points) {
+	const currentLevel = 2 * (Math.pow(points, 2 / 3)) - 1;
 	return currentLevel;
 }
 
