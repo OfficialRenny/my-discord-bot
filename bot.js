@@ -277,7 +277,7 @@ client.on('message', async(message) => {
 			} else {
 				for (var item in listOfStoreItems) {
 					if (args[0] == listOfStoreItems[item][1]) {
-						if ((listOfStoreItems[item][3] - 1) < dbGet.currency) {
+						if (listOfStoreItems[item][3] <= dbGet.currency) {
 							dbGet.points += listOfStoreItems[item][3] / 100;
 							dbGet.currency -= listOfStoreItems[item][3];
 							dbGet[listOfStoreItems[item][0]]++;
@@ -296,9 +296,8 @@ client.on('message', async(message) => {
 
 		if (command == 'give') {
 			if (args[0] == 'help') {
-				return message.channel.send(`\`SYNTAX: ${prefixGet.prefix}give [item] [user(s)]\``);
+				return message.channel.send(`\`SYNTAX: ${prefixGet.prefix}give [item] [user(s)] [amount]\``);
 			}
-			var giveType = "";
 			var channelMembers = message.channel.members.array();
 			var channelMembersNoBots = [];
 			var channelMembersNoBotsToString = "";
@@ -311,10 +310,11 @@ client.on('message', async(message) => {
 			if (!(message.mentions.users.array() || message.mentions.everyone || message.content.indexOf("@someone") != -1)) {
 				return message.reply("you need to mention a user, or use `@someone`!");
 			}
-
+			var botGifted = false;
 			for (var member in message.mentions.users.array()) {
-				if (message.mentions.users.array()[member].id == client.user.id) {
-					return message.channel.send("Oh.... no thanks, you can keep it! >.<");
+				if (message.mentions.users.array()[member].id == client.user.id && botGifted == false) {
+					message.channel.send("Oh.... no thanks, you can keep it! Continuing with the gifting....");
+					botGifted = true;
 				}
 			}
 
@@ -331,7 +331,9 @@ client.on('message', async(message) => {
 				return message.reply("this item does not exist or is not able to be given as a gift.");
 
 			for (var member in channelMembers) {
-				if (member.bot)
+				if (channelMembers[member].user.bot)
+					continue;
+				if (channelMembers[member].user.id == message.author.id)
 					continue;
 				channelMembersNoBots.push(channelMembers[member]);
 			}
@@ -344,7 +346,7 @@ client.on('message', async(message) => {
 			}
 
 			for (var member in message.mentions.users.array()) {
-				if (member.bot)
+				if (message.mentions.users.array()[member].bot)
 					continue;
 				mentionedUsers.push(message.mentions.users.array()[member]);
 			}
@@ -357,24 +359,23 @@ client.on('message', async(message) => {
 				}
 			}
 
-			var randomMember = channelMembersNoBots[Math.floor(Math.random() * channelMembersNoBots.length)];
+			var randomMember = channelMembersNoBots[Math.floor(Math.random() * channelMembersNoBots.length)].user;
 
 			if (message.mentions.everyone) {
-				giveType = "everyone";
 				for (var member in channelMembersNoBots) {
-					usersToGiveTo.push(channelMembersNoBots[member]);
+					usersToGiveTo.push(channelMembersNoBots[member].user);
 				}
-				itemsToGive = channelMembersNoBots.length;
+				itemsToGive = usersToGiveTo.length;
 			} else if (args[1] == "@someone") {
-				giveType = "someone";
 				usersToGiveTo.push(randomMember);
 				itemsToGive = 1;
 			} else if (mentionedUsers.length > -1) {
-				giveType = "users";
 				for (var member in mentionedUsers) {
+					if (mentionedUsers[member].bot)
+						continue;
 					usersToGiveTo.push(mentionedUsers[member]);
 				}
-				itemsToGive = mentionedUsers.length;
+				itemsToGive = usersToGiveTo.length;
 			}
 
 			if (args[0] == "test") {
@@ -392,7 +393,12 @@ client.on('message', async(message) => {
 					usersToGiveToString += "and " + usersToGiveTo[member].username;
 				}
 			}
-
+			
+			if (usersToGiveTo.length == 0)
+				return messae.channel.send("No users specified!");
+			var itemsToReceive = Math.floor(itemsToGive / (usersToGiveTo.length)) * TryParseInt(wordsInMessage[wordsInMessage.length - 1], 1);
+			itemsToGive *= TryParseInt(wordsInMessage[wordsInMessage.length - 1], 1);
+			
 			for (i = 0; i < listOfStoreItems.length; i++) {
 				if (args[0] == listOfStoreItems[i][1]) {
 					if (dbGet[listOfStoreItems[i][0]] >= itemsToGive) {
@@ -403,13 +409,13 @@ client.on('message', async(message) => {
 							if (!someoneDBget) {
 								someoneDBget = generateDbEntry(usersToGiveTo[member]);
 							}
-							someoneDBget[listOfStoreItems[i][0]] += itemsToGive;
+							someoneDBget[listOfStoreItems[i][0]] += itemsToReceive;
 							client.setScore.run(someoneDBget);
-							logger.info(`User ${message.author.username} gave ${usersToGiveTo[member].username} a ${listOfStoreItems[i][2]}!`);
+							logger.info(`User ${message.author.username} gave ${usersToGiveTo[member].username} ${itemsToReceive}x ${listOfStoreItems[i][2]}!`);
 						}
 						const embed = new Discord.RichEmbed()
 							.setTimestamp()
-							.setDescription(`${message.author.username} has just gifted ${usersToGiveToString} ${itemsToGive}x ${listOfStoreItems[i][2]}!`)
+							.setDescription(`${message.author.username} has just gifted ${usersToGiveToString} ${itemsToReceive}x ${listOfStoreItems[i][2]}!`)
 							.setTitle(`You have a gift!`)
 							.setImage(`${listOfStoreItems[i][4]}`);
 						return message.channel.send({
@@ -420,6 +426,7 @@ client.on('message', async(message) => {
 					}
 				}
 			}
+			return message.channel.send("You should never be able to see this message....");
 		}
 
 		if (command == 'inv') {
@@ -532,7 +539,8 @@ function generateDbEntry(usableId) {
 		currency: 0,
 		total_messages_sent: 0,
 		discord_silver: 0,
-		rick_roll: 0
+		rick_roll: 0,
+		manning_face: 0
 	}
 	logger.info("Should have created a DB entry for user " + usableId.username);
 	return returnedDb;
@@ -545,6 +553,18 @@ function calculateLevel(points) {
 function calculatePoints(level) {
 	const currentPoints = Math.pow((level + 1) / 2, 1 / (2 / 3));
 	return currentPoints;
+}
+
+function TryParseInt(str,defaultValue) {
+     var retValue = defaultValue;
+     if(str !== null) {
+         if(str.length > 0) {
+             if (!isNaN(str)) {
+                 retValue = parseInt(str);
+             }
+         }
+     }
+     return retValue;
 }
 
 function ariana4mogs(type, channel, author, guild) {
