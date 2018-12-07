@@ -9,7 +9,7 @@ const sql = new SQLite('./data/db.sqlite');
 
 var storage = JSON.parse(fs.readFileSync('./data/storage.json', 'utf8'));
 const usedActionRecently = new Set();
-const adminID = 197376829408018432;
+const adminID = ['197376829408018432'];
 var adminMode = false;
 
 log4js.configure({
@@ -97,7 +97,6 @@ client.on('message', async(message) => {
 		return;
 	logger.trace(`${message.author.username} in "${message.guild.name} - #${message.channel.name}" said - "${message.content}"`);
 	var alreadyLevelledUp = false;
-
 	var prefixGet = client.getPrefix.get(message.guild.id);
 	if (!prefixGet) {
 		logger.info(`Guild ${message.guild.name} does not yet have a prefix, defaulting to ~.`);
@@ -108,7 +107,7 @@ client.on('message', async(message) => {
 		client.setPrefix.run(prefixGet);
 		logger.info("Done.");
 	}
-
+	
 	var wordsInMessage = message.content.split(" ");
 	var lul = message.guild.emojis.find(emoji => emoji.name.toLowerCase() == "lul");
 	var pogchamp = message.guild.emojis.find(emoji => emoji.name.toLowerCase() == "pogchamp");
@@ -122,7 +121,7 @@ client.on('message', async(message) => {
 	var listOfActionsAsString = "";
 
 	var dbGet = client.getScore.get(message.author.id);
-	var currentTime = Math.floor(Date.now() / 1000);
+	var currentTime = Date.now();
 	if (!dbGet) {
 		dbGet = generateDbEntry(message.author);
 	}
@@ -147,10 +146,15 @@ client.on('message', async(message) => {
 		dbGet.last_known_displayName = message.member.displayName;
 		client.setScore.run(dbGet);
 	} else {
-		if (command == "action") {
+		if (command == "ping") {
+			var pingTime = Date.now();
+			return message.channel.send(`Pong! Latency: ~${currentTime - pingTime}ms`);
+		}
+		
+		if (command == "action" || command ==  "." ||  command == "act") {
 			var actionC = "";
 			for (var i = 0; i < listOfActions.length; i++) {
-				if (listOfActions[i] == wordsInMessage[1]) {
+				if (listOfActions[i] == wordsInMessage[1].toLowerCase()) {
 					actionC = listOfActions[i];
 				}
 				var actionCs = listOfActions[i];
@@ -378,9 +382,6 @@ client.on('message', async(message) => {
 				itemsToGive = usersToGiveTo.length;
 			}
 
-			if (args[0] == "test") {
-				return logger.info(usersToGiveTo);
-			}
 			var usersToGiveToString = "";
 			for (var member in usersToGiveTo) {
 				if (usersToGiveTo.length == 1) {
@@ -395,9 +396,14 @@ client.on('message', async(message) => {
 			}
 			
 			if (usersToGiveTo.length == 0)
-				return messae.channel.send("No users specified!");
+				return message.channel.send("No users specified!");
+			
 			var itemsToReceive = Math.floor(itemsToGive / (usersToGiveTo.length)) * TryParseInt(wordsInMessage[wordsInMessage.length - 1], 1);
 			itemsToGive *= TryParseInt(wordsInMessage[wordsInMessage.length - 1], 1);
+			
+			if (adminMode && adminID.includes(message.author.id)) {
+				itemsToGive = 0;
+			}
 			
 			for (i = 0; i < listOfStoreItems.length; i++) {
 				if (args[0] == listOfStoreItems[i][1]) {
@@ -466,12 +472,12 @@ client.on('message', async(message) => {
 			return message.channel.send(`Created database entries for users: \`\`\`${membersString}\`\`\``);
 		}
 
-		if (command == "admin") {
+		if (command == "godmode") {
 			adminMode = !adminMode;
 			if (adminMode == true) {
-				message.channel.send("Admin mode has been enabled!");
+				message.channel.send("Godmode mode has been enabled, enjoy the free items!");
 			} else {
-				message.channel.send("Admin mode has been disabled!");
+				message.channel.send("Godmode mode has been disabled!");
 			}
 		}
 	}
