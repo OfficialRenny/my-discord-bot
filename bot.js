@@ -6,7 +6,7 @@ const log4js = require('log4js');
 const seedrandom = require('seedrandom');
 const config = require('./data/config.json');
 const sql = new SQLite('./data/db.sqlite');
-
+const ytSearch = require('youtube-search');
 var storage = JSON.parse(fs.readFileSync('./data/storage.json', 'utf8'));
 const usedActionRecently = new Set();
 const adminID = ['197376829408018432'];
@@ -29,6 +29,11 @@ log4js.configure({
 		}
 	}
 });
+
+var opts = {
+  maxResults: 10,
+  key: config.ytKey
+};
 
 var logger = log4js.getLogger('default');
 
@@ -121,7 +126,7 @@ client.on('message', async(message) => {
 	var listOfActionsAsString = "";
 
 	var dbGet = client.getScore.get(message.author.id);
-	var currentTime = Date.now();
+	var currentTime = new Date.now();
 	if (!dbGet) {
 		dbGet = generateDbEntry(message.author);
 	}
@@ -139,7 +144,7 @@ client.on('message', async(message) => {
 	const command = args.shift().slice(prefixGet.prefix.length).toLowerCase();
 
 	if (message.content.indexOf(prefixGet.prefix) !== 0) {
-		let randNum = Math.floor(Math.random() * 11);
+		let randNum = Math.floor((Math.random() * 10) + 1);
 		dbGet.points++;
 		dbGet.currency += randNum;
 		dbGet.total_messages_sent++;
@@ -147,7 +152,7 @@ client.on('message', async(message) => {
 		client.setScore.run(dbGet);
 	} else {
 		if (command == "ping") {
-			var pingTime = Date.now();
+			var pingTime = new Date.now();
 			return message.channel.send(`Pong! Latency: ~${currentTime - pingTime}ms`);
 		}
 		
@@ -166,7 +171,8 @@ client.on('message', async(message) => {
 			}
 			if (actionC != "") {
 				var authorIDandAction = `${message.author.id}-${actionC}`;
-				var randNum = Math.floor(Math.random() * 101);
+				var rnd = seedrandom((message.author.id * message.guild.id * new Date().getTime()).toString());
+				var randNum = Math.floor(rnd()	 * 101);
 				if (!usedActionRecently.has(authorIDandAction)) {
 					dbGet.points += 2;
 					dbGet.currency += randNum;
@@ -197,7 +203,7 @@ client.on('message', async(message) => {
 				dbGet = generateDbEntry(usableId);
 			}
 
-			dbGet.level = calculateLevel(dbGet.points);
+			dbGet.level = Math.floor(calculateLevel(dbGet.points));
 			alreadyLevelledUp = true;
 			const pointsForCurrentLevel = calculatePoints(dbGet.level);
 			const pointsForNextLevel = calculatePoints(parseInt(dbGet.level) + 1);
@@ -314,11 +320,10 @@ client.on('message', async(message) => {
 			if (!(message.mentions.users.array() || message.mentions.everyone || message.content.indexOf("@someone") != -1)) {
 				return message.reply("you need to mention a user, or use `@someone`!");
 			}
-			var botGifted = false;
 			for (var member in message.mentions.users.array()) {
-				if (message.mentions.users.array()[member].id == client.user.id && botGifted == false) {
+				if (message.mentions.users.array()[member].id == client.user.id) {
 					message.channel.send("Oh.... no thanks, you can keep it! Continuing with the gifting....");
-					botGifted = true;
+					break;
 				}
 			}
 
@@ -480,6 +485,33 @@ client.on('message', async(message) => {
 				message.channel.send("Godmode mode has been disabled!");
 			}
 		}
+		
+		if (command == "yt") {
+			ytSearch(args.join(' '), opts, function(err, results) {
+				if(err) return logger.error(err);
+				if (results.length == 0) return message.channel.send("No results found for user.");
+				message.channel.send(results[0].link);
+				logger.info(`User ${message.author.username} requested a video with the URL of ${results[0].link}`);
+			});
+		}
+		
+		if (command == "rp2yt") {
+			var mentionedUser = message.mentions.users.first();
+			if (!mentionedUser)
+				return message.channel.send("You have not mentioned a user.");
+			if (mentionedUser.bot)
+				return message.channel.send("That is a bot...");
+			if (!mentionedUser.presence.game)
+				return message.channel.send("This user is not listening to anything.");
+			if (!mentionedUser.presence.game.details || !mentionedUser.presence.game.state)
+				return message.channel.send("Unable to get user's music.");
+			ytSearch(`${mentionedUser.presence.game.details} - ${mentionedUser.presence.game.state}`, opts, function(err, results) {
+				if(err) return logger.error(err);
+				if (results.length == 0) return message.channel.send("No results found for user.");
+				message.channel.send(results[0].link);
+				logger.info(`User ${message.author.username} requested ${mentionedUser.username}'s song which has the URL of ${results[0].link}`);
+			});
+		}
 	}
 
 	if (message.guild.id == 275388903547076610 || 256139176225931264) {
@@ -518,7 +550,7 @@ client.on('message', async(message) => {
 	}
 
 	if (alreadyLevelledUp == false) {
-		dbGet.level = calculateLevel(dbGet.points);
+		dbGet.level = Math.floor(calculateLevel(dbGet.points));
 	}
 
 	client.setScore.run(dbGet);
