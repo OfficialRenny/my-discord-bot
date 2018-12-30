@@ -8,7 +8,9 @@ const config = require('./data/config.json');
 const sql = new SQLite('./data/db.sqlite');
 const ytSearch = require('youtube-search');
 const Kahoot = require('kahoot.js-republished');
-
+const cheerio = require('cheerio');
+const tabletojson = require('tabletojson');
+const _ = require('underscore');
 var storage = JSON.parse(fs.readFileSync('./data/storage.json', 'utf8'));
 const usedActionRecently = new Set();
 const usedKahootNuke = new Set();
@@ -201,7 +203,6 @@ client.on('message', async(message) => {
 	}
 	const quotedStrings = message.content.split(/(["'])(\\?.)*?\1/);
 	
-	fuckWithMax(message);
 	
 	if (message.content.indexOf(prefixGet.prefix) !== 0) {
 		let randNum = Math.floor((Math.random() * 10) + 1);
@@ -210,10 +211,7 @@ client.on('message', async(message) => {
 		dbGet.total_messages_sent++;
 		dbGet.last_known_displayName = message.author.username;
 		client.setScore.run(dbGet);
-	} else {		
-		if (command == "test") {
-			logger.info(TryParseInt(quotedStrings[0].splice(1, -1), 0));
-		}
+	} else {	
 		if (command == "uptime") {
 			return message.channel.send(`Current Uptime: ${timeConversion(client.uptime)}`);
 		}
@@ -705,7 +703,30 @@ client.on('message', async(message) => {
 				return message.channel.send("You must wait 10 minutes before using the kahoot nuke again.");
 			}
 		}
-		
+		if (command == "d3") {
+			message.channel.startTyping();
+			const item = args.join('+');
+			const url = `https://www.diablonut.com/armory/items.php?search&name=${item}&order=name&direction=ASC`;
+			var embed = new Discord.RichEmbed().setTitle(`Diablo 3 Item Search Results for: ${args.join(' ')}`);
+			tabletojson.convertUrl(url, function(tablesAsJson) {
+				var mainList = tablesAsJson[0];
+				if (!mainList) {
+					message.channel.stopTyping();
+					return message.channel.send(`Could not find an item with the name of "${args.join(' ')}".`);
+				}
+				if (_.size(mainList) > 10) {
+					var limit = 10;
+				} else {
+					var limit = _.size(mainList);
+				}
+				for (i = 0; i < limit; i++) {
+					embed.addField(`${mainList[i].Name} - ${mainList[i].Type} - ${mainList[i].Slot} - ${mainList[i].Rarity}`, `[More Details](https://www.diablonut.com/item/${mainList[i].Name.replace(/\'/g, '').replace(/\ /g, '-')})`);
+				}
+				if (_.size(mainList) > 10) 	embed.addField(`Items shown are limited to 10 to reduce spam`, `[Click here to view all items.](${url})`); 
+				message.channel.stopTyping();
+				return message.channel.send({embed});
+				});
+		}
 	}
 
 	if (message.guild && message.guild.id == 275388903547076610 || 256139176225931264) {
@@ -882,29 +903,16 @@ function randomString() {
   return text;
 }
 
-var percentageDefault = 4;
-var currentPercentage = 0;
-var insultArray = [
-		"a pleb",
-		"a nonce",
-		"a spack",
-		"a square",
-		"an :eggplant:"
-	];
-function fuckWithMax(message) {
-		if (currentPercentage < percentageDefault) currentPercentage = percentageDefault;
-		var rng = seedrandom(`${message.author.id}-${message.content}-${Date.now()}`);
-		if (rng() * 100 < currentPercentage) {
-			message.channel.send(`Max is ${insultArray[Math.floor(rng() * insultArray.length)]}`).then(msg => {
-				var messageToDelete = msg;
-				setTimeout( msg => {
-					messageToDelete.delete();
-					}, 2500);
-			});
-			currentPercentage = percentageDefault;
-		} else {
-			currentPercentage++;
-		}
-}
+function codeBlokkit(message, lang) {
+	var result = "";
+	if (lang == 0) {
+		result += "```\n";
+	} else {
+		result += `\`\`\`${lang}\n`;
+	}
+	result += message;
+	result += "\n```";
+	return result;
+	}
 
 client.login(config.token);

@@ -11,6 +11,8 @@
 	"dependencies": {
 		"better-sqlite-pool": "^0.1.2",
 		"better-sqlite3": "^5.2.1",
+		"blizzard.js": "^2.3.2",
+		"cheerio": "^1.0.0-rc.2",
 		"discord.js": "^11.4.2",
 		"fs": "0.0.1-security",
 		"google": "^2.1.0",
@@ -20,6 +22,8 @@
 		"npm": "^5.10.0",
 		"request": "^2.88.0",
 		"seedrandom": "^2.4.4",
+		"tabletojson": "^1.0.1",
+		"underscore": "^1.9.1",
 		"winston": "^2.4.4",
 		"youtube-search": "^1.1.3"
 	},
