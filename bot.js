@@ -11,7 +11,10 @@ const Kahoot = require('kahoot.js-republished');
 const cheerio = require('cheerio');
 const tabletojson = require('tabletojson');
 const _ = require('underscore');
+
 var storage = JSON.parse(fs.readFileSync('./data/storage.json', 'utf8'));
+const d3skills = JSON.parse(fs.readFileSync('./data/d3/databases/skill.json', 'utf8'));
+const d3items = JSON.parse(fs.readFileSync('./data/d3/databases/item.json', 'utf8'));
 const usedActionRecently = new Set();
 const usedKahootNuke = new Set();
 const adminID = ['197376829408018432'];
@@ -203,7 +206,7 @@ client.on('message', async(message) => {
 	}
 	const quotedStrings = message.content.split(/(["'])(\\?.)*?\1/);
 	
-	
+	fuckWithMax(message);
 	if (message.content.indexOf(prefixGet.prefix) !== 0) {
 		let randNum = Math.floor((Math.random() * 10) + 1);
 		dbGet.points++;
@@ -703,29 +706,181 @@ client.on('message', async(message) => {
 				return message.channel.send("You must wait 10 minutes before using the kahoot nuke again.");
 			}
 		}
+		//if (command == "d3") {
+			//return message.channel.send(`This command is deprecated. Please use either \`${prefixGet.prefix}d3item\` for items or \`${prefixGet.prefix}d3skill\` for skills.`);
+			//~ message.channel.startTyping();
+			//~ const item = args.join('+');
+			//~ const url = `https://www.diablonut.com/armory/items.php?search&name=${item}&order=name&direction=ASC`;
+			//~ var embed = new Discord.RichEmbed().setTitle(`Diablo 3 Item Search Results for: ${args.join(' ')}`);
+			//~ tabletojson.convertUrl(url, function(tablesAsJson) {
+				//~ var mainList = tablesAsJson[0];
+				//~ if (!mainList) {
+					//~ message.channel.stopTyping();
+					//~ return message.channel.send(`Could not find an item with the name of "${args.join(' ')}".`);
+				//~ }
+				//~ if (_.size(mainList) > 10) {
+					//~ var limit = 10;
+				//~ } else {
+					//~ var limit = _.size(mainList);
+				//~ }
+				//~ for (i = 0; i < limit; i++) {
+					//~ embed.addField(`${mainList[i].Name} - ${mainList[i].Type} - ${mainList[i].Slot} - ${mainList[i].Rarity}`, `[More Details](https://www.diablonut.com/item/${mainList[i].Name.replace(/\'/g, '').replace(/\ /g, '-')})`);
+				//~ }
+				//~ if (_.size(mainList) > 10) 	embed.addField(`Items shown are limited to 10 to reduce spam`, `[Click here to view all items.](${url})`); 
+				//~ message.channel.stopTyping();
+				//~ return message.channel.send({embed});
+				//~ });
+		//}
 		if (command == "d3") {
-			message.channel.startTyping();
-			const item = args.join('+');
-			const url = `https://www.diablonut.com/armory/items.php?search&name=${item}&order=name&direction=ASC`;
-			var embed = new Discord.RichEmbed().setTitle(`Diablo 3 Item Search Results for: ${args.join(' ')}`);
-			tabletojson.convertUrl(url, function(tablesAsJson) {
-				var mainList = tablesAsJson[0];
-				if (!mainList) {
-					message.channel.stopTyping();
-					return message.channel.send(`Could not find an item with the name of "${args.join(' ')}".`);
+			var cmd = args.shift();
+			var search = args.join(' ');
+			if (cmd == "item"){
+				var listOfD3items = [];
+				for (var item in d3items) {
+					if (d3items[item].name.replace(/\'/i, '').toLowerCase() == search.replace(/\'/i, '').toLowerCase()) {
+						listOfD3items = [];
+						listOfD3items.push(d3items[item]);
+						break;
+					}
+					if (d3items[item].name.replace(/\'/i, '').toLowerCase().includes(search.replace(/\'/i, '').toLowerCase())) {
+						listOfD3items.push(d3items[item]);
+					}
 				}
-				if (_.size(mainList) > 10) {
+				if (listOfD3items.length == 0) return message.channel.send(`Unable to find \`${search}\`.`);
+				if (listOfD3items.length > 1) {
 					var limit = 10;
+					var namesOfItems = [];
+					if (listOfD3items.length < limit) limit = listOfD3items.length;
+					for (i = 0; i < limit; i++) namesOfItems.push(listOfD3items[i].name);
+					if (listOfD3items.length > 10) namesOfItems.push(`And ${listOfD3items.length - 10} more!`);
+					return message.channel.send(`Your search results brought back: ${codeBlokkit(namesOfItems.join('\n'), 0)} Please refine your search.`);
 				} else {
-					var limit = _.size(mainList);
+					const item = listOfD3items[0];
+					switch (item.color) {
+					case "white":
+						item.color = 0xffffff;
+						break;
+					case "blue":
+						item.color = 0x0000dd;
+						break;
+					case "yellow":
+						item.color = 0xffff00;
+						break;
+					case "orange":
+						item.color = 0xffa500;
+						break;
+					case "green":
+						item.color = 0x00dd00;
+						break;
+					}
+					var embed = new Discord.RichEmbed().setTitle(item.name).setColor(item.color).setThumbnail(item.icon);
+					if (item.desc != "") {
+						embed.setDescription(item.desc);
+					} else { 
+						embed.setDescription(item.legend);
+					}
+					embed.addField("Level Requirement", item.level).addField("Type", `${item.quality} ${item.type}`, true);
+					if (!isEmpty(item.owner)) embed.addField("Class Item", item.owner, true); 
+					if (item.attrs.aws.length > 0 ) embed.addField("Attributes", item.attrs.aws.join('\n'));
+					if (item.attrs.legendaryeffect.length > 0) embed.addField("Legendary Effect", item.attrs.legendaryeffect.join(' '));
+					var choicesAndEffects = item.attrs.choices.concat(item.attrs.effects);
+					if (choicesAndEffects.length > 0) embed.addField("Can Roll With", choicesAndEffects.join('\n'), true);
+					if (!isEmpty(item.attrs.extras)) embed.addField("Extras", item.attrs.extras.join('\n'), true);
+					if (!isEmpty(item.set.name)) {
+						let temp = item.set.bonus.shift();
+						embed.addField("Set Bonus", item.set.name.split().concat(item.set.bonus).join('\n'));
+					}
+					if (!isEmpty(item.source.cost)) {
+						var itemMaterials = [];
+						var itemStrings = [];
+						for (var material in item.source.parts) {
+							for (var w in d3items) {
+								if (d3items[w].id == item.source.parts[material].id) {
+								itemMaterials.push(d3items[w]);
+								continue;
+								}
+							}
+						}
+						for (var mat in itemMaterials) itemStrings.push(`${item.source.parts[mat].num}x ${itemMaterials[mat].name}`);
+						embed.addField("Crafting Requirements", `${item.source.cost} Gold\n${itemStrings.join('\n')}`);
+						embed.addField("Required Artisan Level", item.source.rank, true);
+					}
+					return message.channel.send({embed});
 				}
-				for (i = 0; i < limit; i++) {
-					embed.addField(`${mainList[i].Name} - ${mainList[i].Type} - ${mainList[i].Slot} - ${mainList[i].Rarity}`, `[More Details](https://www.diablonut.com/item/${mainList[i].Name.replace(/\'/g, '').replace(/\ /g, '-')})`);
+			} else if (cmd == "skill") {
+				var listOfD3skills = [];
+				for (var skill in d3skills) {
+					if (d3skills[skill].name.replace(/\'/i, '').toLowerCase() == search.replace(/\'/i, '').toLowerCase()) {
+						listOfD3skills = [];
+						listOfD3skills.push(d3skills[skill]);
+						break;
+					}
+					if (d3skills[skill].name.replace(/\'/i, '').toLowerCase().includes(search.replace(/\'/i, '').toLowerCase())) {
+						listOfD3skills.push(d3skills[skill]);
+					}
 				}
-				if (_.size(mainList) > 10) 	embed.addField(`Items shown are limited to 10 to reduce spam`, `[Click here to view all items.](${url})`); 
-				message.channel.stopTyping();
-				return message.channel.send({embed});
-				});
+				if (listOfD3skills.length == 0) return message.channel.send(`Unable to find \`${search}\`.`);
+				if (listOfD3skills.length > 1) {
+					var limit = 10;
+					var namesOfSkills = [];
+					if (listOfD3skills.length < limit) limit = listOfD3skills.length;
+					for (i = 0; i < limit; i++) namesOfSkills.push(listOfD3skills[i].name);
+					if (listOfD3skills.length > 10) namesOfSkills.push(`And ${listOfD3skills.length - 10} more!`);
+					return message.channel.send(`Your search results brought back: ${codeBlokkit(namesOfSkills.join('\n'), 0)} Please refine your search.`);
+				} else {
+					const skill = listOfD3skills[0];
+					const type = skill.active ? "Active" : "Passive";
+					var embed = new Discord.RichEmbed().setTitle(`${type} - ${skill.name}`).setColor(0xa50000).setThumbnail(skill.icon).setDescription(skill.desc.join('\n'));
+					if (!isEmpty(skill.legend)) embed.addField("Legend", skill.legend);
+					if (!isEmpty(skill.cost)) embed.addField("Skill Cost", skill.cost);
+					if (!isEmpty(skill.generate)) embed.addField("Generates", skill.generate);
+					if (!isEmpty(skill.category)) embed.addField("Category", skill.category, true);
+					embed.addField("Class", skill.owner.split('-').map((s) => s.charAt(0).toUpperCase() + s.substring(1)).join(' '), true);
+					if (skill.runes.length > 0) {
+						var runeStrings = [];
+						for (var r in skill.runes) {
+							let rune = skill.runes[r];
+							runeStrings.push(`**${rune.name}** - ${rune.desc} - *Unlocked at Level ${rune.level}*`);
+						}
+						embed.addField("Runes", runeStrings.join('\n\n'));
+					}
+					return message.channel.send({embed});
+				}
+			}
+		}
+		
+		if (command == "blocky") {
+			var regionalIndicatorString = "";
+			var arrayOfNums = [
+				"zero",
+				"one",
+				"two",
+				"three",
+				"four",
+				"five",
+				"six",
+				"seven",
+				"eight",
+				"nine",
+			];
+			for (var word in args) {
+					var w = args[word];
+					for (var letter in w) {
+						var l = w[letter];
+						if (l.match(/[a-z]/i)) {
+							regionalIndicatorString += `:regional_indicator_${l.toLowerCase()}:`;
+						} else if (l.match(/[0-9]/)) {
+							var n = TryParseInt(l, l);
+							regionalIndicatorString += `:${arrayOfNums[n]}:`;
+						} else {
+							regionalIndicatorString += `${l}`;
+						}
+					}
+					regionalIndicatorString += "  ";
+				}
+			if (regionalIndicatorString.length > 2000) return message.channel.send("That would be too long.");
+			if (regionalIndicatorString.length < 1) return message.channel.send("That would be an empty message.");
+			return message.channel.send(`${regionalIndicatorString}`);
 		}
 	}
 
@@ -914,5 +1069,35 @@ function codeBlokkit(message, lang) {
 	result += "\n```";
 	return result;
 	}
+	
+function isEmpty(str) {
+		return (!str || /^\s*$/.test(str));
+	}
+	
+var percentageDefault = 4;
+var currentPercentage = 0;
+var insultArray = [
+		"a pleb",
+		"a nonce",
+		"a square",
+		"an :eggplant:"
+	];
+function fuckWithMax(message) {
+	if(message.guild.id == 487547206283427840) {
+		if (currentPercentage < percentageDefault) currentPercentage = percentageDefault;
+		var rng = seedrandom(`${message.author.id}-${message.content}-${Date.now()}`);
+		if (rng() * 100 < currentPercentage) {
+			message.channel.send(`Max is ${insultArray[Math.floor(rng() * insultArray.length)]}`).then(msg => {
+				var messageToDelete = msg;
+				setTimeout( msg => {
+					messageToDelete.delete();
+					}, 2500);
+			});
+			currentPercentage = percentageDefault;
+		} else {
+			currentPercentage++;
+		}
+	}
+}
 
 client.login(config.token);
