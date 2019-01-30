@@ -9,7 +9,6 @@ const sql = new SQLite('./data/db.sqlite');
 const ytSearch = require('youtube-search');
 const Kahoot = require('kahoot.js-republished');
 const cheerio = require('cheerio');
-const tabletojson = require('tabletojson');
 const _ = require('underscore');
 
 var storage = JSON.parse(fs.readFileSync('./data/storage.json', 'utf8'));
@@ -17,7 +16,7 @@ const d3skills = JSON.parse(fs.readFileSync('./data/d3/databases/skill.json', 'u
 const d3items = JSON.parse(fs.readFileSync('./data/d3/databases/item.json', 'utf8'));
 const usedActionRecently = new Set();
 const usedKahootNuke = new Set();
-const adminID = ['197376829408018432'];
+const adminID = ['197376829408018432', '108875959628795904'];
 var adminMode = false;
 var userThatIsOnlyReferencedOnce;
 
@@ -62,10 +61,10 @@ var opts = {
 var logger = log4js.getLogger('default');
 
 var listOfStoreItems = [
-	["discord_silver", "silver", "Discord Silver", 500, "https://i.imgur.com/Vt7NLdA.png"],
-	["discord_gold", "gold", "Discord Gold", 1000, "https://i.imgur.com/ODufnWD.png"],
-	["rick_roll", "rick", "Rick Roll", 250, "https://media.giphy.com/media/Vuw9m5wXviFIQ/giphy.gif"],
-	["manning_face", "manning", "ManningFace", 100, "https://i.imgur.com/ENPyFSU.jpg"]
+	{dbname: "discord_silver", cmd: "silver", name: "Discord Silver", price: 500, url: "https://i.imgur.com/Vt7NLdA.png"},
+	{dbname: "discord_gold", cmd: "gold", name: "Discord Gold", price: 1000, url: "https://i.imgur.com/D42SF2A.png"},
+	{dbname: "rick_roll", cmd: "rick", name: "Rick Roll", price: 250, url: "https://media.giphy.com/media/Vuw9m5wXviFIQ/giphy.gif"},
+	{dbname: "manning_face", cmd: "manning", name: "ManningFace", price: 100, url: "https://i.imgur.com/ENPyFSU.jpg"}
 ];
 
 var eightBallAnswers = [
@@ -107,6 +106,13 @@ client.on('ready', async() => {
 		sql.prepare("CREATE UNIQUE INDEX idx_prefixDb_id ON prefixDb (id);").run();
 		sql.pragma("synchronous = 1");
 	}
+	
+	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'd3CharDb';").get();
+	if (!table['count(*)']) {
+		sql.prepare("CREATE TABLE d3CharDb (id TEXT PRIMARY KEY, charName TEXT, class TEXT, head TEXT, torso TEXT, shoulders TEXT, arms TEXT, bracers TEXT, pants TEXT, boots TEXT, primary_hand TEXT, off_hand TEXT, ring_1 TEXT, ring_2 TEXT, amulet TEXT, legendary_gems TEXT, cube_armor TEXT, cube_weapon TEXT, cube_ring TEXT);").run();
+		sql.prepare("CREATE UNIQUE INDEX idx_d3CharDb_id ON d3CharDb (id);").run();
+		sql.pragma("synchronous = 1");
+	}
 
 	var arrayOfDBColumns = sql.prepare("PRAGMA table_info(mainDb);").all();
 	var allColumns = [];
@@ -117,9 +123,9 @@ client.on('ready', async() => {
 	}
 
 	for (i = 0; i < listOfStoreItems.length; i++) {
-		if (!allColumns.includes(listOfStoreItems[i][0])) {
-			logger.info(`${listOfStoreItems[i][0]} does not yet exist in the database. Creating...`);
-			sql.prepare(`ALTER TABLE mainDb ADD COLUMN ${listOfStoreItems[i][0]} INTEGER DEFAULT 0;`).run();
+		if (!allColumns.includes(listOfStoreItems[i]["dbname"])) {
+			logger.info(`${listOfStoreItems[i]["dbname"]} does not yet exist in the database. Creating...`);
+			sql.prepare(`ALTER TABLE mainDb ADD COLUMN ${listOfStoreItems[i]["dbname"]} INTEGER DEFAULT 0;`).run();
 		}
 	}
 
@@ -132,6 +138,10 @@ client.on('ready', async() => {
 
 	client.getPrefix = sql.prepare("SELECT * FROM prefixDb WHERE id = ?");
 	client.setPrefix = sql.prepare("INSERT OR REPLACE INTO prefixDb (id, prefix) VALUES (@id, @prefix);");
+	
+	client.getD3Char = sql.prepare("SELECT * FROM d3CharDb WHERE id = ?");
+	client.setD3Char = sql.prepare("INSERT OR REPLACE INTO d3CharDb (id, charName, class, head, torso, shoulders, arms, bracers, pants, boots, primary_hand, off_hand, ring_1, ring_2, amulet, legendary_gems, cube_armor, cube_weapon, cube_ring) VALUES (@id, @charName, @class, @head, @torso, @shoulders, @arms, @bracers, @pants, @boots, @primary_hand, @off_hand, @ring_1, @ring_2, @amulet, @legendary_gems, @cube_armor, @cube_weapon, @cube_ring);");
+	
 	userThatIsOnlyReferencedOnce = await client.fetchUser(adminID[0]);
 	logger.info('Ready and logged in as ' + client.user.username + '!');
 	client.user.setPresence({
@@ -148,13 +158,13 @@ client.on('message', async(message) => {
 		return;
 	var chatChannel;
 	var chatName;
+
 	if (!message.guild) {
-		logger.trace(`DM from ${message.author.username} - "${message.content}"`);
 		chatChannel = message.author;
 		chatName = message.author.username;
-		if (message.author.id != userThatIsOnlyReferencedOnce.id) userThatIsOnlyReferencedOnce.send(`DM from ${chatName} - "${message.content}"`);
+		if (message.author.id != userThatIsOnlyReferencedOnce.id) userThatIsOnlyReferencedOnce.send(`DM from ${chatName} - ${message.content} - ${attachmentsStr}`);
 	} else {
-		logger.trace(`${message.author.username} in "${message.guild.name} - #${message.channel.name}" said - "${message.content}"`);
+		fuckWithMax(message);
 		chatChannel = message.guild;
 		chatName = message.guild.name;
 	}
@@ -204,9 +214,8 @@ client.on('message', async(message) => {
 	} else {
 		command = args.shift().slice(prefixGet.prefix.length).toLowerCase();
 	}
-	const quotedStrings = message.content.split(/(["'])(\\?.)*?\1/);
+	var quotedStrings = message.content.match(/(?=["'])(?:"[^"\\]*(?:\\[\s\S][^"\\]*)*"|'[^'\\]*(?:\\[\s\S][^'\\]*)*')/g);
 	
-	fuckWithMax(message);
 	if (message.content.indexOf(prefixGet.prefix) !== 0) {
 		let randNum = Math.floor((Math.random() * 10) + 1);
 		dbGet.points++;
@@ -214,7 +223,7 @@ client.on('message', async(message) => {
 		dbGet.total_messages_sent++;
 		dbGet.last_known_displayName = message.author.username;
 		client.setScore.run(dbGet);
-	} else {	
+	} else {
 		if (command == "uptime") {
 			return message.channel.send(`Current Uptime: ${timeConversion(client.uptime)}`);
 		}
@@ -236,32 +245,33 @@ client.on('message', async(message) => {
 			var usedActions = [];
 			var reusedActions = [];
 			for (var word in args) {
-				if (listOfActions.includes(args[word])) {
-					if (usedActions.includes(args[word]) && !reusedActions.includes(args[word])) {
-						reusedActions.push(args[word]);
+				var action = args[word].toLowerCase();
+				if (listOfActions.includes(action)) {
+					if (usedActions.includes(action) && !reusedActions.includes(action)) {
+						reusedActions.push(action);
 						continue;
 					}
-					usedActions.push(args[word]);
-					var authorIDandAction = `${message.author.id}-${args[word]}`;
+					usedActions.push(action);
+					var authorIDandAction = `${message.author.id}-${action}`;
 					var rnd = seedrandom((message.author.id * chatChannel.id * new Date().getTime()).toString());
 					var randNum = Math.floor(rnd() * 101);
 					if (!usedActionRecently.has(authorIDandAction)) {
 						dbGet.points += 2;
 						dbGet.currency += randNum;
-						message.channel.send(`You used '${args[word]}' and gained ${randNum}:money_with_wings:!`);
+						message.channel.send(`You used '${action}' and gained ${randNum}:money_with_wings:!`);
 						usedActionRecently.add(authorIDandAction);
 						setTimeout(() => {
 							if (usedActionRecently.has(authorIDandAction)) {
 							usedActionRecently.delete(authorIDandAction);
 							}
 						}, 60000 * 2);
-						logger.info(`${message.author.username} used ${args[word]} and got a score of ${randNum}`);
+						logger.info(`${message.author.username} used ${action} and got a score of ${randNum}`);
 					} else if (usedActionRecently.has(authorIDandAction)) {
-						reusedActions.push(args[word]);
+						reusedActions.push(action);
 					}
 				}
 			}
-			
+			logger.info(usedActionRecently);
 			if (reusedActions.length > 0) {
 				return message.channel.send(`You need to wait 2 minutes before using actions ${stringifyArray(reusedActions)} again.`);
 			}
@@ -358,23 +368,24 @@ client.on('message', async(message) => {
 					.setFooter(`Your balance is ${dbGet.currency}`)
 					.setColor(0x406DA2);
 				for (k = 0; k < listOfStoreItems.length; k++) {
-					embed.addField(`${listOfStoreItems[k][2]} - ${prefixGet.prefix}buy ${listOfStoreItems[k][1]}`, `${listOfStoreItems[k][3]}:money_with_wings:`);
+					embed.addField(`${listOfStoreItems[k]["name"]} - ${prefixGet.prefix}buy ${listOfStoreItems[k]["cmd"]}`, `${listOfStoreItems[k]["price"]}:money_with_wings:`);
 				}
 				return message.channel.send({
 					embed
 				});
 			} else {
+				var cmdItem = args.shift();
 				for (var item in listOfStoreItems) {
-					if (args[0] == listOfStoreItems[item][1]) {
-						if (listOfStoreItems[item][3] <= dbGet.currency) {
-							dbGet.points += listOfStoreItems[item][3] / 100;
-							dbGet.currency -= listOfStoreItems[item][3];
-							dbGet[listOfStoreItems[item][0]]++;
+					if (cmdItem == listOfStoreItems[item]["cmd"]) {
+						if (listOfStoreItems[item]["price"] <= dbGet.currency) {
+							dbGet.points += listOfStoreItems[item]["price"] / 100;
+							dbGet.currency -= listOfStoreItems[item]["price"];
+							dbGet[listOfStoreItems[item]["dbname"]]++;
 							client.setScore.run(dbGet);
-							return message.reply(`thank you for buying a ${listOfStoreItems[item][2]}, your balance is now ${dbGet.currency}:money_with_wings:`);
+							return message.reply(`thank you for buying a ${listOfStoreItems[item]["name"]}, your balance is now ${dbGet.currency}:money_with_wings:`);
 							break;
 						} else {
-							return message.reply(`you do not have enough :money_with_wings: to purchase a ${listOfStoreItems[item][2]}.`);
+							return message.reply(`you do not have enough :money_with_wings: to purchase a ${listOfStoreItems[item]["name"]}.`);
 						}
 						break;
 					}
@@ -396,6 +407,7 @@ client.on('message', async(message) => {
 			var itemsToGive = 0;
 			var usersToGiveTo = [];
 			var isAnItem = false;
+			var item = args.shift();
 
 			if (!(message.mentions.users.array() || message.mentions.everyone || message.content.indexOf("@someone") != -1 || quotedStrings)) {
 				return message.reply("you need to mention a user, use their ID in quotes, or use `@someone`!");
@@ -408,7 +420,7 @@ client.on('message', async(message) => {
 			}
 
 			for (i = 0; i < listOfStoreItems.length; i++) {
-				if (args[0] == listOfStoreItems[i][1]) {
+				if (item == listOfStoreItems[i]["cmd"]) {
 					isAnItem = true;
 					break;
 				} else {
@@ -448,7 +460,7 @@ client.on('message', async(message) => {
 				}
 			}
 
-			var randomMember = channelMembersNoBots[Math.floor(Math.random() * channelMembersNoBots.length)].user;
+			var randomMember = channelMembersNoBots.length > 1 ? channelMembersNoBots[Math.floor(Math.random() * channelMembersNoBots.length)].user : null;
 
 			if (message.mentions.everyone) {
 				for (var member in channelMembersNoBots) {
@@ -466,18 +478,28 @@ client.on('message', async(message) => {
 				}
 				itemsToGive = usersToGiveTo.length;
 			} else if (quotedStrings.length > 0) {
-				logger.info(quotedStrings);
-				for (var member in quotedStrings) {
-					const splicedID = TryParseInt(quotedStrings[member].splice(1, -1), 0);
-					if (splicedID == 0) invalidMembers.push(quotedStrings[member]);
-					var user = await client.fetchUser(splicedID);
-					logger.info(user);
-				}
+					quotedStrings.forEach(async (z, index) => {
+						logger.info(`Doing async function #${index}`);
+						var splicedID = TryParseInt(z.splice(1, -1), 0);
+						if (splicedID == 0) {
+						invalidMembers.push(z);
+						return;
+						}
+						var user = await client.fetchUser(splicedID).catch((err) => {
+							logger.info(err);
+							invalidMembers.push(z);
+							return;
+							});
+						usersToGiveTo.push(user);
+						logger.info(`${user.username} has been gifted by ID.`);
+					});
 			}
 			if (invalidMembers.length > 0) {
-				return message.channel.send(`${stringifyArray} is/are not valid ID(s).`);
+				return message.channel.send(`${stringifyArray(invalidMembers)} is/are not valid ID(s).`);
 			}
-			
+			if (usersToGiveTo.length == 0)
+				return message.channel.send("No users specified!");
+				
 			var usersToGiveToString = "";
 			for (var member in usersToGiveTo) {
 				if (usersToGiveTo.length == 1) {
@@ -491,9 +513,6 @@ client.on('message', async(message) => {
 				}
 			}
 
-			if (usersToGiveTo.length == 0)
-				return message.channel.send("No users specified!");
-
 			var itemsToReceive = Math.floor(itemsToGive / (usersToGiveTo.length)) * TryParseInt(wordsInMessage[wordsInMessage.length - 1], 1);
 			itemsToGive *= TryParseInt(wordsInMessage[wordsInMessage.length - 1], 1);
 
@@ -502,29 +521,29 @@ client.on('message', async(message) => {
 			}
 
 			for (i = 0; i < listOfStoreItems.length; i++) {
-				if (args[0] == listOfStoreItems[i][1]) {
-					if (dbGet[listOfStoreItems[i][0]] >= itemsToGive) {
-						dbGet[listOfStoreItems[i][0]] -= itemsToGive;
+				if (item == listOfStoreItems[i]["cmd"]) {
+					if (dbGet[listOfStoreItems[i]["dbname"]] >= itemsToGive) {
+						dbGet[listOfStoreItems[i]["dbname"]] -= itemsToGive;
 						client.setScore.run(dbGet);
 						for (var member in usersToGiveTo) {
 							var someoneDBget = client.getScore.get(usersToGiveTo[member].id);
 							if (!someoneDBget) {
 								someoneDBget = generateDbEntry(usersToGiveTo[member]);
 							}
-							someoneDBget[listOfStoreItems[i][0]] += itemsToReceive;
+							someoneDBget[listOfStoreItems[i]["dbname"]] += itemsToReceive;
 							client.setScore.run(someoneDBget);
-							logger.info(`User ${message.author.username} gave ${usersToGiveTo[member].username} ${itemsToReceive}x ${listOfStoreItems[i][2]}!`);
+							logger.info(`User ${message.author.username} gave ${usersToGiveTo[member].username} ${itemsToReceive}x ${listOfStoreItems[i]["name"]}!`);
 						}
 						const embed = new Discord.RichEmbed()
 							.setTimestamp()
-							.setDescription(`${message.author.username} has just gifted ${usersToGiveToString} ${itemsToReceive}x ${listOfStoreItems[i][2]}!`)
+							.setDescription(`${message.author.username} has just gifted ${usersToGiveToString} ${itemsToReceive}x ${listOfStoreItems[i]["name"]}!`)
 							.setTitle(`You have a gift!`)
-							.setImage(`${listOfStoreItems[i][4]}`);
+							.setImage(`${listOfStoreItems[i]["url"]}`);
 						return message.channel.send({
 							embed
 						});
 					} else {
-						return message.channel.send(`You do not have enough ${listOfStoreItems[i][2]} to give, why not buy some from the store?`);
+						return message.channel.send(`You do not have enough ${listOfStoreItems[i]["name"]} to give, why not buy some from the store?`);
 					}
 				}
 			}
@@ -539,7 +558,7 @@ client.on('message', async(message) => {
 				.setFooter(`Your balance is ${dbGet.currency}`)
 				.setColor(0x406DA2);
 			for (k = 0; k < listOfStoreItems.length; k++) {
-				embed.addField(`${listOfStoreItems[k][2]}`, `${dbGet[listOfStoreItems[k][0]]}`, true);
+				embed.addField(`${listOfStoreItems[k]["name"]}`, `${dbGet[listOfStoreItems[k]["dbname"]]}`, true);
 			}
 			message.channel.send({
 				embed
@@ -574,12 +593,12 @@ client.on('message', async(message) => {
 			return message.channel.send(`Created database entries for users: \`\`\`${membersString}\`\`\``);
 		}
 
-		if (command == "godmode") {
+		if (command == "godmode" && adminID.includes(message.author.id)) {
 			adminMode = !adminMode;
 			if (adminMode == true) {
-				message.channel.send("Godmode mode has been enabled, enjoy the free items!");
+				message.channel.send("Godmode has been enabled, enjoy the free items!");
 			} else {
-				message.channel.send("Godmode mode has been disabled!");
+				message.channel.send("Godmode has been disabled!");
 			}
 		}
 		
@@ -706,31 +725,6 @@ client.on('message', async(message) => {
 				return message.channel.send("You must wait 10 minutes before using the kahoot nuke again.");
 			}
 		}
-		//if (command == "d3") {
-			//return message.channel.send(`This command is deprecated. Please use either \`${prefixGet.prefix}d3item\` for items or \`${prefixGet.prefix}d3skill\` for skills.`);
-			//~ message.channel.startTyping();
-			//~ const item = args.join('+');
-			//~ const url = `https://www.diablonut.com/armory/items.php?search&name=${item}&order=name&direction=ASC`;
-			//~ var embed = new Discord.RichEmbed().setTitle(`Diablo 3 Item Search Results for: ${args.join(' ')}`);
-			//~ tabletojson.convertUrl(url, function(tablesAsJson) {
-				//~ var mainList = tablesAsJson[0];
-				//~ if (!mainList) {
-					//~ message.channel.stopTyping();
-					//~ return message.channel.send(`Could not find an item with the name of "${args.join(' ')}".`);
-				//~ }
-				//~ if (_.size(mainList) > 10) {
-					//~ var limit = 10;
-				//~ } else {
-					//~ var limit = _.size(mainList);
-				//~ }
-				//~ for (i = 0; i < limit; i++) {
-					//~ embed.addField(`${mainList[i].Name} - ${mainList[i].Type} - ${mainList[i].Slot} - ${mainList[i].Rarity}`, `[More Details](https://www.diablonut.com/item/${mainList[i].Name.replace(/\'/g, '').replace(/\ /g, '-')})`);
-				//~ }
-				//~ if (_.size(mainList) > 10) 	embed.addField(`Items shown are limited to 10 to reduce spam`, `[Click here to view all items.](${url})`); 
-				//~ message.channel.stopTyping();
-				//~ return message.channel.send({embed});
-				//~ });
-		//}
 		if (command == "d3") {
 			var cmd = args.shift();
 			var search = args.join(' ');
@@ -846,7 +840,66 @@ client.on('message', async(message) => {
 					}
 					return message.channel.send({embed});
 				}
+			} else if (cmd == "char") {
+				var itemTypes = [
+					"head",
+					"torso",
+					"shoulders",
+					"arms",
+					"bracers",
+					"pants",
+					"boots",
+					"primary_hand",
+					"off_hand",
+					"ring_1",
+					"ring_2",
+					"amulet",
+					"legendary_gems",
+					"cube_armor",
+					"cube_weapon",
+					"cube_ring"
+				];
+				return message.channel.send("WIP");
+				subCmd = args.shift().toLowerCase();
+				if (subCmd == "help" || "h") return message.channel.send(`List of commands for the Diablo 3 loadout saver:\n ${codeBlokkit("Help (You are here)\nCreate - Creates a new character.\nAdd - Add an item to your loadout\nRemove - Removes an item from your loadout\nView - Views your current loadout\nSet Name - Sets your character's name\nSet Class - Sets your character's class", 0)}`);
+				var charGet = client.getD3Char.get(message.author.id);
+				if (!charGet && subCmd != "create") return message.channel.send(`Please use \`${prefixGet.prefix}d3 char create\` to create your loadout.`);
+				if (subCmd == "create") {
+						charGet = generateD3Char(message.author.id);
+						client.setD3char.run(charGet);
+						return message.channel.send("Successfully created a new character.");
+					}
+				
+				}
+		}
+		
+		if (command == "qp" || command == "poll") {
+			if (args.length < 1) return message.channel.send("Please ask a question.");
+			var numOfResponses = TryParseInt(args.shift(), 0);
+			var arrayOfNums = [ "0⃣", "1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟"];
+			if (numOfResponses == 0) {
+				return message.react('✅').then(message.react('❎'));
 			}
+			function multiResponse(num, msg) {
+				var multiResponseFunc = function(curNum) {
+					msg.react(`${arrayOfNums[curNum]}`)
+						.then(() => {
+						if (curNum < num) {
+							multiResponseFunc(curNum + 1);
+						} else return logger.info(`${msg.author.username} made a poll with ${curNum} responses!`);
+					});
+				}
+				multiResponseFunc(1);
+			}
+			if (numOfResponses > 0 && numOfResponses < 11) {
+				multiResponse(numOfResponses, message);
+			} else {
+				message.react('✅').then(() => {
+					message.react('❎');
+					});
+				return;
+			}
+			
 		}
 		
 		if (command == "blocky") {
@@ -868,10 +921,21 @@ client.on('message', async(message) => {
 					for (var letter in w) {
 						var l = w[letter];
 						if (l.match(/[a-z]/i)) {
-							regionalIndicatorString += `:regional_indicator_${l.toLowerCase()}:`;
+							var rand = Math.random();
+							if (l.toLowerCase() == 'a') {
+								if (rand < 0.5) {
+								regionalIndicatorString += `:a:\u200B`;
+								} else regionalIndicatorString += `:regional_indicator_a:\u200B`;
+							} else if (l.toLowerCase() == 'b') {
+								if (rand < 0.5) {
+								regionalIndicatorString += `:b:\u200B`;
+								} else regionalIndicatorString += `:regional_indicator_b:\u200B`;
+							} else {
+								regionalIndicatorString += `:regional_indicator_${l.toLowerCase()}:\u200B`;
+							}
 						} else if (l.match(/[0-9]/)) {
 							var n = TryParseInt(l, l);
-							regionalIndicatorString += `:${arrayOfNums[n]}:`;
+							regionalIndicatorString += `:${arrayOfNums[n]}:\u200B`;							
 						} else {
 							regionalIndicatorString += `${l}`;
 						}
@@ -881,6 +945,13 @@ client.on('message', async(message) => {
 			if (regionalIndicatorString.length > 2000) return message.channel.send("That would be too long.");
 			if (regionalIndicatorString.length < 1) return message.channel.send("That would be an empty message.");
 			return message.channel.send(`${regionalIndicatorString}`);
+		}
+		
+		if (adminID.includes(message.author.id)) {
+			if (command == "tables") {
+				var tables = sql.prepare("SELECT tbl_name FROM sqlite_master WHERE type = 'table';").get();
+				logger.info(tables);
+			} 
 		}
 	}
 
@@ -913,6 +984,10 @@ client.on('message', async(message) => {
 			}
 		}
 	}
+	
+	if (message.content.toLowerCase().indexOf('the greater good') !== -1) {
+		message.channel.send('The greater good.');
+		}
 
 	if (message.content.toLowerCase().startsWith('>tfw') || message.content.toLowerCase().startsWith('tfw')) {
 		message.channel.send('feels bad man :(')
@@ -952,6 +1027,31 @@ function generateDbEntry(usableId) {
 	}
 	logger.info("Should have created a DB entry for user " + usableId.username);
 	return returnedDb;
+}
+
+function generateD3Char(id) {
+	var returnedDb;
+	returnedDb = {
+		id: id,
+		charName: "None",
+		class: "None",
+		head: "None",
+		torso: "None",
+		shoulders: "None",
+		arms: "None",
+		bracers: "None",
+		pants: "None",
+		boots: "None",
+		primary_hand: "None",
+		off_hand: "None",
+		ring_1: "None",
+		ring_2: "None",
+		amulet: "None",
+		legendary_gems: "None",
+		cube_armor: "None",
+		cube_weapon: "None",
+		cube_ring: "None"
+	}
 }
 
 function calculateLevel(points) {
@@ -1074,13 +1174,14 @@ function isEmpty(str) {
 		return (!str || /^\s*$/.test(str));
 	}
 	
-var percentageDefault = 4;
+var percentageDefault = 1;
 var currentPercentage = 0;
 var insultArray = [
 		"a pleb",
 		"a nonce",
 		"a square",
-		"an :eggplant:"
+		"an :eggplant:",
+		"feg"
 	];
 function fuckWithMax(message) {
 	if(message.guild.id == 487547206283427840) {
@@ -1095,9 +1196,13 @@ function fuckWithMax(message) {
 			});
 			currentPercentage = percentageDefault;
 		} else {
-			currentPercentage++;
+			currentPercentage += 0.5;;
 		}
 	}
 }
+
+client.on('error', (error) => {
+	logger.error(error);
+});
 
 client.login(config.token);
