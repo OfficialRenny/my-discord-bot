@@ -4,7 +4,7 @@
 	"description": "Just a simple discord bot",
 	"main": "~/Documents/discord-bot/bot.js",
 	"scripts": {
-		"start": "node bot.js"
+		"start": "npx pm2 start bot.js"
 	},
 	"author": "Renny",
 	"license": "ISC",

@@ -1,5 +1,6 @@
 const Discord = require('discord.js');
 const f = require('../utils/functions.js');
+const v = require('../utils/vars.js');
 module.exports = {
 	name: 'Poll',
 	help: 'Make a quick poll, supports yes/no questions and questions with upto 10 choices.',
@@ -16,7 +17,7 @@ module.exports = {
 						.then(() => {
 						if (curNum < num) {
 							multiResponseFunc(curNum + 1);
-						} else return logger.info(`${msg.author.username} made a poll with ${curNum} responses!`);
+						} else return v.logger.info(`${msg.author.username} made a poll with ${curNum} responses!`);
 					});
 				}
 				multiResponseFunc(1);

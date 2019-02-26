@@ -20,7 +20,7 @@ module.exports = {
 			var isAnItem = false;
 			var item = args.shift();
 			var wordsInMessage = message.content.split(' ');
-			if (!(message.mentions.users.array() || message.mentions.everyone || message.content.indexOf("@someone") != -1 || quotedStrings)) {
+			if (!(message.mentions.users.array() || message.mentions.everyone || message.content.indexOf("@someone") != -1 || Client.temp.quotedStrings)) {
 				return message.reply("you need to mention a user, use their ID in quotes, or use `@someone`!");
 			}
 			for (var member in message.mentions.users.array()) {
@@ -91,10 +91,10 @@ module.exports = {
 				}
 				itemsToGive = usersToGiveTo.length;
 				gifting();
-			} else if (quotedStrings.length > 0) {
+			} else if (Client.temp.quotedStrings.length > 0) {
 				var quoteGifting = function(index) {
-					if (index >= quotedStrings.length) return gifting();
-					var giftee = quotedStrings[index].slice(1, -1);
+					if (index >= Client.temp.quotedStrings.length) return gifting();
+					var giftee = Client.temp.quotedStrings[index].slice(1, -1);
 						Client.bot.fetchUser(giftee).then(
 						(user) => {
 						usersToGiveTo.push(user);
@@ -110,7 +110,7 @@ module.exports = {
 			
 			function gifting() {
 			if (invalidMembers.length > 0) {
-				return message.channel.send(`${stringifyArray(invalidMembers)} is/are not valid ID(s).`);
+				return message.channel.send(`${F.stringifyArray(invalidMembers)} is/are not valid ID(s).`);
 			}
 			if (usersToGiveTo.length == 0)
 				return message.channel.send("No users specified!");

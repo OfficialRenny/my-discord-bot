@@ -1,5 +1,7 @@
 const Discord = require('discord.js');
 module.exports = {
+	name: 'Spoilers',
+	help: 'Have the bot turn your message into 2 different kinds of spoilers.',
 	func: (Client, message, args) => {
 		var cmd = args.shift();
 		if (cmd == "1") {

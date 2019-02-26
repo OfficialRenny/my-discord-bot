@@ -26,3 +26,4 @@ log4js.configure({
 });
 
 module.exports.logger = log4js.getLogger('default');
+module.exports.admins = ['197376829408018432', '108875959628795904'];

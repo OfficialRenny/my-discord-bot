@@ -10,7 +10,7 @@ module.exports = {
 	name: 'Action',
 	help: 'Allows you to do actions for currency.',
 	func: (Client, message, args) => {
-		if (args[0] == "help") return message.channel.send("Available actions are: " + util.stringifyArray(listOfActions) + ". `SYNTAX: " + Client.prefix + "action [action]`");
+		if (args[0] == "help") return message.channel.send("Available actions are: " + util.stringifyArray(listOfActions) + ". `SYNTAX: " + Client.prefix.prefix + "action [action]`");
 			var usedActions = [];
 			var reusedActions = [];
 			for (var word in args) {
@@ -22,11 +22,11 @@ module.exports = {
 					}
 					usedActions.push(action);
 					var authorIDandAction = `${message.author.id}-${action}`;
-					var rnd = seedrandom((message.author.id * chatChannel.id * new Date().getTime()).toString());
+					var rnd = seedrandom((message.author.id * Client.temp.chatChannel.id * new Date().getTime()).toString());
 					var randNum = Math.floor(rnd() * 101);
 					if (!usedActionRecently.has(authorIDandAction)) {
-						dbGet.points += 2;
-						dbGet.currency += randNum;
+						Client.temp.dbGet.points += 2;
+						Client.temp.dbGet.currency += randNum;
 						message.channel.send(`You used '${action}' and gained ${randNum}:money_with_wings:!`);
 						usedActionRecently.add(authorIDandAction);
 						setTimeout(() => {

@@ -39,16 +39,6 @@ log4js.configure({
 
 var logger = log4js.getLogger('default');
 
-let commandsList = fs.readdirSync('./commands/');
-Client.commands = {};
-for (i = 0; i < commandsList.length; i++) {
-    let item = commandsList[i];
-    if (item.match(/\.js$/)) {
-        delete require.cache[require.resolve(`./commands/${item}`)];
-        Client.commands[item.slice(0, -3)] = require(`./commands/${item}`);
-    }
-}
-
 Client.load = (command) => {
     let commandsList = fs.readdirSync('./commands/');
     if (command) {
@@ -157,14 +147,15 @@ Client.bot.on('message', async(message) => {
 	
 	var wordsInMessage = message.content.split(/\s+/g);
 	Client.temp.dbGet = Client.getScore.get(message.author.id);
-	var currentTime = Date.now();
 	if (!Client.temp.dbGet) {
-		Client.temp.dbGet = generateDbEntry(message.author);
+		Client.temp.dbGet = F.generateDbEntry(message.author);
 	}
-
+	Client.temp.savedTime = Date.now();
+	const splitprefix = Client.prefix.prefix.split(/\s+/g);
 	const args = message.content.split(/\s+/g);
-	var command = args.shift().slice(Client.prefix.prefix.length).toLowerCase();
-	var quotedStrings = message.content.match(/(?=["'])(?:"[^"\\]*(?:\\[\s\S][^"\\]*)*"|'[^'\\]*(?:\\[\s\S][^'\\]*)*')/g);
+	for (i = 0; i < splitprefix.length - 1; i++) args.shift();
+	var command = args.shift().slice(splitprefix[splitprefix.length -1].length).toLowerCase();
+	Client.temp.quotedStrings = message.content.match(/(?=["'])(?:"[^"\\]*(?:\\[\s\S][^"\\]*)*"|'[^'\\]*(?:\\[\s\S][^'\\]*)*')/g);
 	
 	if (message.content.indexOf(Client.prefix.prefix) !== 0) {
 		let randNum = Math.floor((Math.random() * 10) + 1);
@@ -219,7 +210,7 @@ Client.bot.on('message', async(message) => {
 });
 
 Client.bot.on('error', (error) => {
-	logger.error(error);
+	logger.error(error.message);
 });
 
 Client.bot.login(Client.config.token);

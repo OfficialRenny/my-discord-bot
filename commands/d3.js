@@ -3,6 +3,7 @@ const fs = require('fs');
 const d3skills = JSON.parse(fs.readFileSync('./data/d3/databases/skill.json', 'utf8'));
 const d3items = JSON.parse(fs.readFileSync('./data/d3/databases/item.json', 'utf8'));
 const f = require('../utils/functions.js');
+const v = require('../utils/vars.js');
 
 module.exports = {
 	name: 'Diablo 3 Item and Skill stuff',
@@ -56,17 +57,17 @@ module.exports = {
 						embed.setDescription(item.legend);
 					}
 					embed.addField("Level Requirement", item.level).addField("Type", `${item.quality} ${item.type}`, true);
-					if (!isEmpty(item.owner)) embed.addField("Class Item", item.owner, true); 
+					if (!f.isEmpty(item.owner)) embed.addField("Class Item", item.owner, true); 
 					if (item.attrs.aws.length > 0 ) embed.addField("Attributes", item.attrs.aws.join('\n'));
 					if (item.attrs.legendaryeffect.length > 0) embed.addField("Legendary Effect", item.attrs.legendaryeffect.join(' '));
 					var choicesAndEffects = item.attrs.choices.concat(item.attrs.effects);
 					if (choicesAndEffects.length > 0) embed.addField("Can Roll With", choicesAndEffects.join('\n'), true);
-					if (!isEmpty(item.attrs.extras)) embed.addField("Extras", item.attrs.extras.join('\n'), true);
-					if (!isEmpty(item.set.name)) {
+					if (!f.isEmpty(item.attrs.extras)) embed.addField("Extras", item.attrs.extras.join('\n'), true);
+					if (!f.isEmpty(item.set.name)) {
 						let temp = item.set.bonus.shift();
 						embed.addField("Set Bonus", item.set.name.split().concat(item.set.bonus).join('\n'));
 					}
-					if (!isEmpty(item.source.cost)) {
+					if (!f.isEmpty(item.source.cost)) {
 						var itemMaterials = [];
 						var itemStrings = [];
 						for (var material in item.source.parts) {
@@ -107,10 +108,10 @@ module.exports = {
 					const skill = listOfD3skills[0];
 					const type = skill.active ? "Active" : "Passive";
 					var embed = new Discord.RichEmbed().setTitle(`${type} - ${skill.name}`).setColor(0xa50000).setThumbnail(skill.icon).setDescription(skill.desc.join('\n'));
-					if (!isEmpty(skill.legend)) embed.addField("Legend", skill.legend);
-					if (!isEmpty(skill.cost)) embed.addField("Skill Cost", skill.cost);
-					if (!isEmpty(skill.generate)) embed.addField("Generates", skill.generate);
-					if (!isEmpty(skill.category)) embed.addField("Category", skill.category, true);
+					if (!f.isEmpty(skill.legend)) embed.addField("Legend", skill.legend);
+					if (!f.isEmpty(skill.cost)) embed.addField("Skill Cost", skill.cost);
+					if (!f.isEmpty(skill.generate)) embed.addField("Generates", skill.generate);
+					if (!f.isEmpty(skill.category)) embed.addField("Category", skill.category, true);
 					embed.addField("Class", skill.owner.split('-').map((s) => s.charAt(0).toUpperCase() + s.substring(1)).join(' '), true);
 					if (skill.runes.length > 0) {
 						var runeStrings = [];

@@ -1,3 +1,4 @@
+const seedrandom = require('seedrandom');
 module.exports.generateDbEntry = (usableId) => {
 	var currentTime = Math.floor(Date.now() / 1000);
 	logger.info(`User ${usableId.username} does not currently have an entry in the DB. Making one now`);

@@ -6,10 +6,10 @@ module.exports = {
 		cmd = args.shift();
 		if (cmd == 'set') {
 			Client.prefix.prefix = args.join(' ');
-			Client.setPrefix.run(prefixGet);
+			Client.setPrefix.run(Client.prefix);
 			message.channel.send(`Successfully changed the prefix to \`${Client.prefix.prefix}\``);
 		}
-		if (cmd == 'get' || message.content.startsWith('~prefix get')) {
+		if ((cmd == 'get') || (message.content.indexOf('~prefix get') !== -1)) {
 			message.channel.send(`The prefix for this server is \`${Client.prefix.prefix}\``);
 		}
 	}

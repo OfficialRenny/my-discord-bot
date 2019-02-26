@@ -1,5 +1,6 @@
 const Discord = require('discord.js');
 const seedrandom = require('seedrandom');
+const F = require('../utils/functions.js');
 
 module.exports = {
 	name: 'Dice Roll',
@@ -23,12 +24,12 @@ module.exports = {
 			if (!timesToRoll || !diceNumber) return message.channel.send(`Please choose a number of dice to roll. \`SYNTAX: ${Client.prefix.prefix}roll 1d20\`.`);
 			var time = new Date().getTime();
 			for (i = 0; i < timesToRoll; i++) {
-				var seed = (message.author.id * chatChannel.id * time * (i + 1)).toString();
+				var seed = (message.author.id * Client.temp.chatChannel.id * time * (i + 1)).toString();
 				var rng = seedrandom(seed);
 				rolledNumbers.push(Math.ceil(rng() * diceNumber));
 			}
 			
-			messageToSend = `${message.author.username} rolled ${stringifyArray(rolledNumbers)}.`;
+			messageToSend = `${message.author.username} rolled ${F.stringifyArray(rolledNumbers)}.`;
 			
 			if (messageToSend.length  > 2000) {
 				message.channel.send("The message would be too long...");

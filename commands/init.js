@@ -12,10 +12,10 @@ module.exports = {
 				if (arrayOfMembers[guildMemberId].user.bot)
 					continue;
 
-				Client.temp.dbGet = client.getScore.get(arrayOfMembers[guildMemberId].user.id);
+				Client.temp.dbGet = Client.getScore.get(arrayOfMembers[guildMemberId].user.id);
 				if (!Client.temp.dbGet) {
 					Client.temp.dbGet = generateDbEntry(arrayOfMembers[guildMemberId].user);
-					client.setScore.run(Client.temp.dbGet);
+					Client.setScore.run(Client.temp.dbGet);
 					membersString += arrayOfMembers[guildMemberId].user.username + '\n';
 				}
 			}

@@ -10,7 +10,7 @@ module.exports = {
 			if (num < 1 || num > 100) return message.channel.send("Please choose a number between 1 and 100.");
 
 			var time = new Date().getTime();
-			var seed = (message.author.id * chatChannel.id * time).toString();
+			var seed = (message.author.id * Client.temp.chatChannel.id * time).toString();
 			var rng = seedrandom(seed);
 			
 			if (Math.floor((rng() * 100 + 1)) > num) {
