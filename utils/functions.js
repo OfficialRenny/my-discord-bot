@@ -1,3 +1,4 @@
+const fs = require('fs');
 const seedrandom = require('seedrandom');
 module.exports.generateDbEntry = (usableId) => {
 	var currentTime = Math.floor(Date.now() / 1000);
@@ -107,7 +108,6 @@ module.exports.ariana4mogs = (type, channel, author, guild) => {
 		var files = fs.readdirSync(path)
 			ranFile = files[Math.floor(rng() * files.length)]
 	}
-	logger.info(`Sending a file with the name of ${path + ranFile} to ${channel.name} in ${guild.name}, requested by ${author.username}. Seed: '${seed}'.`);
 	return path + ranFile;
 }
 

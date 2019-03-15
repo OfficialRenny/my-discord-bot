@@ -4,11 +4,13 @@ const SQLite = require("better-sqlite3");
 const fs = require('fs');
 const log4js = require('log4js');
 const seedrandom = require('seedrandom');
+const Sugar = require('sugar');
 const sql = new SQLite('./data/db.sqlite');
 const F = require('./utils/functions.js');
 const V = require('./utils/vars.js');
 const adminID = ['197376829408018432', '108875959628795904'];
 var userThatIsOnlyReferencedOnce;
+var reminderRegex = /Remind (.+) to (.+) (in|next) (.+)/gi;
 
 Client = {
     config: require('./data/config.json'),
@@ -99,7 +101,7 @@ Client.bot.on('ready', async() => {
 	for (i = 0; i < allColumns.length; i++) {
 		allColumnsValues.push(`@${allColumns[i]}`);
 	}
-
+	sql.prepare("CREATE TABLE IF NOT EXISTS reminders (id INTEGER PRIMARY KEY AUTOINCREMENT, remind_who TEXT, reminder TEXT, requested_by TEXT, channel TEXT, time INTEGER)").run();
 	Client.getScore = sql.prepare("SELECT * FROM mainDb WHERE user = ?");
 	Client.setScore = sql.prepare(`INSERT OR REPLACE INTO mainDb (${allColumns.toString()}) VALUES (${allColumnsValues.toString()});`);
 
@@ -109,8 +111,14 @@ Client.bot.on('ready', async() => {
 	Client.getD3Char = sql.prepare("SELECT * FROM d3CharDb WHERE id = ?");
 	Client.setD3Char = sql.prepare("INSERT OR REPLACE INTO d3CharDb (id, charName, class, head, torso, shoulders, arms, bracers, pants, boots, primary_hand, off_hand, ring_1, ring_2, amulet, legendary_gems, cube_armor, cube_weapon, cube_ring) VALUES (@id, @charName, @class, @head, @torso, @shoulders, @arms, @bracers, @pants, @boots, @primary_hand, @off_hand, @ring_1, @ring_2, @amulet, @legendary_gems, @cube_armor, @cube_weapon, @cube_ring);");
 	
+	Client.getReminder = sql.prepare("SELECT * FROM reminders WHERE time < ?");
+	Client.setReminder = sql.prepare("INSERT INTO reminders (remind_who, reminder, requested_by, channel, time) VALUES (@remind_who, @reminder, @requested_by, @channel, @time)");
+	
 	userThatIsOnlyReferencedOnce = await Client.bot.fetchUser(adminID[0]);
 	logger.info('Ready and logged in as ' + Client.bot.user.username + '!');
+	//setInterval(() => {
+	//		Reminders();
+	//	}, 1000);
 	Client.bot.user.setPresence({
 		game: {
 			name: 'commands. Prefix: ~',
@@ -138,7 +146,7 @@ Client.bot.on('message', async(message) => {
 		logger.info(`${Client.temp.chatName} does not yet have a prefix, defaulting to ~.`);
 		message.channel.send(`${Client.temp.chatName} does not yet have a prefix, defaulting to ~.`);
 		Client.prefix = {
-			id: `${chatChannel.id}`,
+			id: `${Client.temp.chatChannel.id}`,
 			prefix: "~"
 		}
 		Client.setPrefix.run(Client.prefix);
@@ -168,7 +176,22 @@ Client.bot.on('message', async(message) => {
 	} else 	if (command in Client.commands) {
 		Client.commands[command].func(Client, message, args);
 	}
-
+	var match = reminderRegex.exec(message.content);
+	if (match == "something that will never happen") {
+		console.log(match);
+		var sugartime = `${match[3]} ${match[4]}`;
+		let utime = (new Date(Sugar.Date.create(sugartime))).getTime();
+		let reminder = {
+			remind_who: match[1],
+			reminder: match[2],
+			requested_by: message.author.username,
+			channel: message.channel.id,
+			time: utime
+		}
+		Client.setReminder.run(reminder);
+		message.channel.send("Set a reminder for " + Sugar.Date.create(sugartime) + "!");
+		
+	}
 	if (message.guild && message.guild.id == 275388903547076610 || 256139176225931264) {
 		for (var i = 0; i < wordsInMessage.length; i++) {
 			if (wordsInMessage[i].toLowerCase() == "tra") {
@@ -180,7 +203,7 @@ Client.bot.on('message', async(message) => {
 
 			if (wordsInMessage[i].toLowerCase() == "ariana") {
 				message.channel.startTyping();
-				fileName = ariana4mogs(0, chatChannel, message.author, chatChannel);
+				fileName = F.ariana4mogs(0, Client.temp.chatChannel, message.author, Client.temp.chatChannel);
 				message.channel.send({
 					file: fileName
 				});
@@ -189,7 +212,7 @@ Client.bot.on('message', async(message) => {
 			}
 			if (wordsInMessage[i].toLowerCase() == "monky") {
 				message.channel.startTyping();
-				fileName = ariana4mogs(1, chatChannel, message.author, chatChannel);
+				fileName = F.ariana4mogs(1, Client.temp.chatChannel, message.author, Client.temp.chatChannel);
 				message.channel.send({
 					file: fileName
 				});
@@ -212,5 +235,19 @@ Client.bot.on('message', async(message) => {
 Client.bot.on('error', (error) => {
 	logger.error(error.message);
 });
+
+function Reminders() {
+	let reminders = Client.getReminder.get(Date.now());
+	console.log(reminders);
+	sql.prepare(`DELETE FROM reminders WHERE id = ${reminders.id}`);
+	//for (var reminder in reminders) {
+		//curRem = reminders[reminder];
+		//id, remind_who, reminder, requested_by, channel, time
+		//Client.bot.channels.get(curRem.channel).send(`Reminder for ${curRem.remind_who}: ${curRem.reminder} - Requested by: ${curRem.requested_by}.`).then(() => {
+		//	sql.prepare(`DELETE FROM reminders WHERE id = ${curRem.id}`);
+		//	})
+		//	.catch((err) => logger.error(err));
+	//}
+}
 
 Client.bot.login(Client.config.token);
