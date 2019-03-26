@@ -11,14 +11,16 @@ const V = require('./utils/vars.js');
 const adminID = ['197376829408018432', '108875959628795904'];
 var userThatIsOnlyReferencedOnce;
 var reminderRegex = /Remind (.+) to (.+) (in|next) (.+)/gi;
+const {google} = require('googleapis');
 
 Client = {
     config: require('./data/config.json'),
     bot: _b,
     temp: 	{
-
+				sheets: null
 			}
 }
+Client.temp.sheets = google.sheets({version: 'v4', auth: Client.config.GoogleApiKey});
 
 log4js.configure({
 	appenders: {
@@ -192,7 +194,7 @@ Client.bot.on('message', async(message) => {
 		message.channel.send("Set a reminder for " + Sugar.Date.create(sugartime) + "!");
 		
 	}
-	if (message.guild && message.guild.id == 275388903547076610 || 256139176225931264) {
+	if ((message.guild.id == 275388903547076610 || 256139176225931264) && (message.channel.id != 419956848930848778) && !message.content.startsWith(Client.prefix)) {
 		for (var i = 0; i < wordsInMessage.length; i++) {
 			if (wordsInMessage[i].toLowerCase() == "tra") {
 				message.channel.startTyping();

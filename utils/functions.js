@@ -1,4 +1,25 @@
 const fs = require('fs');
+const log4js = require('log4js');
+log4js.configure({
+	appenders: {
+		consoleLogs: {
+			type: 'file',
+			filename: './data/logs/console.log',
+			maxLogSize: 256000
+		},
+		console: {
+			type: 'console'
+		}
+	},
+	categories: {
+	default: {
+			appenders: ['console', 'consoleLogs'],
+			level: 'trace'
+		}
+	}
+});
+
+var logger = log4js.getLogger('default');
 const seedrandom = require('seedrandom');
 module.exports.generateDbEntry = (usableId) => {
 	var currentTime = Math.floor(Date.now() / 1000);
