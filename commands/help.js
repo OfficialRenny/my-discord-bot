@@ -10,6 +10,9 @@ module.exports = {
         } else {
             let help = "";
             for (var command in Client.commands) {
+		if (Client.commands[command].servers) {
+		    if (!Client.commands[command].servers.includes(msg.guild.id)) continue;
+		}
                 help += `${Client.prefix.prefix + command} :: ${Client.commands[command].help}\n`
             }
             msg.channel.send(F.codeBlokkit(help, 'asciidoc'));

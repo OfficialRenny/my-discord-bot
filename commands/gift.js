@@ -91,7 +91,7 @@ module.exports = {
 				}
 				itemsToGive = usersToGiveTo.length;
 				gifting();
-			} else if (Client.temp.quotedStrings.length > 0) {
+			} else if (Client.temp.quotedStrings) {
 				var quoteGifting = function(index) {
 					if (index >= Client.temp.quotedStrings.length) return gifting();
 					var giftee = Client.temp.quotedStrings[index].slice(1, -1);

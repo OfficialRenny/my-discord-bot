@@ -5,6 +5,7 @@ const f = require('../utils/functions.js');
 module.exports = {
 	name: 'Kahoot Nuke',
 	help: 'Floods a Kahhot server with as many bots as you want, limited at the maximum member cap for Kahoot.',
+	servers: ['407633043579338764', '256139176225931264'],
 	func: (Client, message, args) => {
 				if (args.length < 2) return message.channel.send("Please provide the number of bots for the kahoot and the kahoot ID number. `SYNTAX: [number of bots] [room number]`.");
 				var numOfBots = f.TryParseInt(args[0], 0);

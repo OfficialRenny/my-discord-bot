@@ -158,7 +158,7 @@ module.exports.isEmpty = (str) => {
 		return (!str || /^\s*$/.test(str));
 	}
 	
-var percentageDefault = 1;
+var percentageDefault = 0.1;
 var currentPercentage = 0;
 var insultArray = [
 		"a pleb",
@@ -180,7 +180,7 @@ module.exports.fuckWithMax = (message) => {
 			});
 			currentPercentage = percentageDefault;
 		} else {
-			currentPercentage += 0.5;;
+			currentPercentage += 0.1;;
 		}
 	}
 }
