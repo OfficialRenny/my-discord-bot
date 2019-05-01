@@ -1,6 +1,7 @@
 const Discord = require('discord.js');
 const ytSearch = require('youtube-search');
 
+
 var opts = {
 	maxResults: 10,
 	key: Client.config.GoogleApiKey
@@ -21,11 +22,11 @@ module.exports = {
 				return message.channel.send(`Unable to find music for User ${mentionedUser.username}.`);
 			ytSearch(`${mentionedUser.presence.game.details} - ${mentionedUser.presence.game.state}`, opts, function (err, results) {
 				if (err)
-					return logger.error(err);
+					return console.log(err);
 				if (results.length == 0)
 					return message.channel.send("No results found for user.");
 				message.channel.send(results[0].link);
-				logger.info(`User ${message.author.username} requested ${mentionedUser.username}'s song which has the URL of ${results[0].link}`);
+				console.log(`User ${message.author.username} requested ${mentionedUser.username}'s song which has the URL of ${results[0].link}`);
 			});
 	}
 }

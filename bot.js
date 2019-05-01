@@ -17,7 +17,15 @@ Client = {
     config: require('./data/config.json'),
     bot: _b,
     temp: 	{
-				sheets: null
+				sheets: null,
+				general: [],
+				exotics: [],
+				aviations: [],
+				timestamps: {
+					exotics: null,
+					general: null,
+					aviations: null
+				}
 			}
 }
 Client.temp.sheets = google.sheets({version: 'v4', auth: Client.config.GoogleApiKey});
@@ -62,6 +70,10 @@ Client.load = (command) => {
     }
 }
 Client.load();
+
+if (Client.temp.exotics == null) UpdateExoticsVehs();
+if (Client.temp.general == null) UpdateGeneralVehs();
+if (Client.temp.aviations == null) UpdateAviationVehs();
 
 Client.bot.on('ready', async() => {
 	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'mainDb';").get();
@@ -167,7 +179,7 @@ Client.bot.on('message', async(message) => {
 	var command = args.shift().slice(splitprefix[splitprefix.length -1].length).toLowerCase();
 	Client.temp.quotedStrings = message.content.match(/(?=["'])(?:"[^"\\]*(?:\\[\s\S][^"\\]*)*"|'[^'\\]*(?:\\[\s\S][^'\\]*)*')/g);
 	
-	if (message.content.indexOf(Client.prefix.prefix) !== 0) {
+	if (!message.content.startsWith(Client.prefix.prefix)) {
 		let randNum = Math.floor((Math.random() * 10) + 1);
 		Client.temp.dbGet.points++;
 		Client.temp.dbGet.currency += randNum;
@@ -202,10 +214,26 @@ Client.bot.on('message', async(message) => {
 				message.channel.stopTyping();
 				return;
 			}
+			
+			if (wordsInMessage[i].toLowerCase() == "folina") {
+				message.channel.startTyping();
+				message.channel.send("sahlo");
+				message.channel.stopTyping();
+				return;
+			}
 
 			if (wordsInMessage[i].toLowerCase() == "ariana") {
 				message.channel.startTyping();
 				fileName = F.ariana4mogs(0, Client.temp.chatChannel, message.author, Client.temp.chatChannel);
+				message.channel.send({
+					file: fileName
+				});
+				message.channel.stopTyping();
+				return;
+			}
+			if (wordsInMessage[i].toLowerCase() == "selena") {
+				message.channel.startTyping();
+				fileName = F.ariana4mogs(2, Client.temp.chatChannel, message.author, Client.temp.chatChannel);
 				message.channel.send({
 					file: fileName
 				});
@@ -251,5 +279,108 @@ function Reminders() {
 		//	.catch((err) => logger.error(err));
 	//}
 }
+
+function Vehicle(timestamp, charName, forumName, vehicle, vehLink) {
+	this.timestamp = timestamp;
+	this.charName = charName;
+	this.forumName = forumName;
+	this.vehicle = vehicle;
+	this.vehLink = vehLink;
+}
+
+function UpdateExoticsVehs() {
+	Client.temp.sheets.spreadsheets.get({
+		spreadsheetId: '1pDAGbdSjALnWs2l2CSOjRxliatNHiaIAxTPjYl1iSzI',
+		ranges: 'Responses',
+		includeGridData: true
+	}, (err, res) => {
+		if (err) {
+			return console.log('The API returned an error: ' + err);
+		}
+		const rows = res.data.sheets[0].data[0].rowData;
+		if (rows) {
+			let tempArr = [];
+			for (var r in rows) {
+				curRow = rows[r].values;
+				if (!(curRow[0].effectiveValue)) continue;
+				cellColor = curRow[0].effectiveFormat.backgroundColor;
+				if (!(cellColor.red == 1 && cellColor.green == 1 && cellColor.blue == 1)) continue;
+				//console.log(curRow);
+				let timestamp = curRow[0].formattedValue;
+				let charName = curRow[1].formattedValue;
+				let forumName = curRow[3].formattedValue;
+				let vehicle = curRow[7].formattedValue;
+				let vehLink = curRow[6].formattedValue;
+				tempArr.push(new Vehicle(timestamp, charName, forumName, vehicle, vehLink));
+			}
+			Client.temp.exotics = tempArr;
+			Client.temp.timestamps.exotics = new Date();
+		}
+	});
+}
+
+function UpdateGeneralVehs() {
+	Client.temp.sheets.spreadsheets.get({
+		spreadsheetId: '1__oeLjgRicHRb8WKPxJe6tgU6dMHotPXfc-M7InAi80',
+		ranges: 'Responses!A1000:M2253',
+		includeGridData: true
+	}, (err, res) => {
+		if (err) {
+			return console.log('The API returned an error: ' + err);
+		}
+		const rows = res.data.sheets[0].data[0].rowData;
+		if (rows) {
+			let tempArr = [];
+			for (var r in rows) {
+				curRow = rows[r].values;
+				if (!(curRow[0].effectiveValue)) continue;
+				cellColor = curRow[0].effectiveFormat.backgroundColor;
+				if (!(cellColor.red == 1 && cellColor.green == 1 && cellColor.blue == 1)) continue;
+				let timestamp = curRow[0].formattedValue;
+				let charName = curRow[1].formattedValue;
+				let forumName = curRow[2].formattedValue;
+				let vehicle = curRow[7].formattedValue;
+				let vehLink = curRow[6].formattedValue;
+				tempArr.push(new Vehicle(timestamp, charName, forumName, vehicle, vehLink));
+			}
+			Client.temp.general = tempArr;
+			Client.temp.timestamps.general = new Date();
+		}
+	});
+}
+
+function UpdateAviationVehs() {
+	Client.temp.sheets.spreadsheets.get({
+		spreadsheetId: '1I0pP7DMrV_QprEWmnJrhMPEonQ4Ky3a7Plv_SBsyrfY',
+		ranges: 'FORM RESPONSES!A2:K300',
+		includeGridData: true
+	}, (err, res) => {
+		if (err) {
+			return console.log('The API returned an error: ' + err);
+		}
+		const rows = res.data.sheets[0].data[0].rowData;
+		if (rows) {
+			let tempArr = [];
+			for (var r in rows) {
+				curRow = rows[r].values;
+				if (!(curRow[0].effectiveValue)) continue;
+				cellColor = curRow[0].effectiveFormat.backgroundColor;
+				if (!(cellColor.red == 1 && cellColor.green == 1 && cellColor.blue == 1)) continue;
+				let timestamp = curRow[0].formattedValue;
+				let charName = curRow[1].formattedValue;
+				let forumName = curRow[3].formattedValue;
+				let vehicle = curRow[7].formattedValue;
+				let vehLink = curRow[6].formattedValue;
+				tempArr.push(new Vehicle(timestamp, charName, forumName, vehicle, vehLink));
+			}
+			Client.temp.general = tempArr;
+			Client.temp.timestamps.aviations = new Date();
+		}
+	});
+}
+
+setInterval(UpdateExoticsVehs, 1000 * 60 * 60);
+setInterval(UpdateGeneralVehs, 1000 * 55 * 60);
+setInterval(UpdateAviationVehs, 1000 * 65 * 60);
 
 Client.bot.login(Client.config.token);

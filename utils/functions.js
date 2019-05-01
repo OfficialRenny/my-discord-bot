@@ -129,6 +129,12 @@ module.exports.ariana4mogs = (type, channel, author, guild) => {
 		var files = fs.readdirSync(path)
 			ranFile = files[Math.floor(rng() * files.length)]
 	}
+	if (type == 2) {
+		var path = './data/server-specifics/skrippics/';
+		var files = fs.readdirSync(path)
+			ranFile = files[Math.floor(rng() * files.length)]
+	}
+	
 	return path + ranFile;
 }
 

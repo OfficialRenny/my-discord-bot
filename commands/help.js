@@ -6,7 +6,11 @@ module.exports = {
     help: 'yeet',
     func: (Client, msg, args) => {
         if (args.length > 0) {
-            if (args[0] in Client.commands && Client.commands[args[0]].help) msg.channel.send(F.codeBlokkit(`${Client.prefix.prefix + args[0]} :: ${Client.commands[args[0]].help}`, 'asciidoc'));
+            if (args[0] in Client.commands && Client.commands[args[0]].help) {
+		let helpText = `${Client.prefix.prefix + args[0]} :: ${Client.commands[args[0]].help}\n`;
+		if (Client.commands[args[0]].syntax) helpText += Client.commands[args[0]].syntax;
+		msg.channel.send(F.codeBlokkit(helpText, 'asciidoc'));
+	    }
         } else {
             let help = "";
             for (var command in Client.commands) {
