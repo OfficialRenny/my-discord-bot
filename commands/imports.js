@@ -14,13 +14,17 @@ module.exports = {
 		if (Client.temp.general.length < 1) return message.channel.send("There are no pending imports");
 		for (veh in Client.temp.general) {
 			curVeh = Client.temp.general[veh];
-			txt += `${curVeh.charName} (( ${curVeh.forumName} )) requested a ${curVeh.vehicle} at ${curVeh.timestamp}.\nLink: ${curVeh.vehLink}\n\n`;
+			txt += `${curVeh.charName} (( ${curVeh.forumName} )) requested a ${curVeh.vehicle} at ${curVeh.timestamp}.\n\n`;
 		}
 		var temp = Client.temp.timestamps.general;
 		var date = temp.getFullYear()+'-'+(temp.getMonth()+1)+'-'+temp.getDate();
 		var time = temp.getHours() + ":" + temp.getMinutes() + ":" + temp.getSeconds();
 		txt += `Last Updated: ${date} ${time}`;
-		return message.channel.send(F.codeBlokkit(txt, 'asciidoc'));
+		if (txt.length > 2000) {
+			return message.channel.send("There are way too many requests to fit into a single discord message, sort them out!");
+		} else {
+			return message.channel.send(F.codeBlokkit(txt, 'asciidoc'));
+		}
 	}
 }
 

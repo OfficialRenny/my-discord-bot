@@ -25,7 +25,7 @@ module.exports = {
 		}
 		return message.reply(`${args[0]} is not a valid item, please check \`${Client.prefix.prefix}buy store\` for a list of all items.`);
 	} else {
-		const embed = new Discord.RichEmbed()
+		const embed = new Discord.MessageEmbed()
 			.setTitle("Store")
 			.setThumbnail(message.author.displayAvatarURL)
 			.setDescription("Welcome to the store, spend your :money_with_wings: here!")

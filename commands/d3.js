@@ -50,7 +50,7 @@ module.exports = {
 						item.color = 0x00dd00;
 						break;
 					}
-					var embed = new Discord.RichEmbed().setTitle(item.name).setColor(item.color).setThumbnail(item.icon);
+					var embed = new Discord.MessageEmbed().setTitle(item.name).setColor(item.color).setThumbnail(item.icon);
 					if (item.desc != "") {
 						embed.setDescription(item.desc);
 					} else { 
@@ -107,7 +107,7 @@ module.exports = {
 				} else {
 					const skill = listOfD3skills[0];
 					const type = skill.active ? "Active" : "Passive";
-					var embed = new Discord.RichEmbed().setTitle(`${type} - ${skill.name}`).setColor(0xa50000).setThumbnail(skill.icon).setDescription(skill.desc.join('\n'));
+					var embed = new Discord.MessageEmbed().setTitle(`${type} - ${skill.name}`).setColor(0xa50000).setThumbnail(skill.icon).setDescription(skill.desc.join('\n'));
 					if (!f.isEmpty(skill.legend)) embed.addField("Legend", skill.legend);
 					if (!f.isEmpty(skill.cost)) embed.addField("Skill Cost", skill.cost);
 					if (!f.isEmpty(skill.generate)) embed.addField("Generates", skill.generate);

@@ -34,7 +34,7 @@ module.exports = {
 					if (char.history[i] == null || undefined) continue;
 					corps.push(char.history[i]);
 				}
-				var embed = new Discord.RichEmbed()
+				var embed = new Discord.MessageEmbed()
 				    .setTitle(char['info']['name'])
 				    .setThumbnail("https://image.eveonline.com/Character/" + char['info']['character_id'] + "_1024.jpg")
 				    .setDescription(`Character Info Lookup for ${char['info']['name']}.`)
@@ -63,7 +63,7 @@ module.exports = {
 				let corp = await SearchCorpByName(args.join("%20"));
 				if (corp['info'].length < 1) return message.edit("Could not find that corporation.");
 				let ceo = await SearchCharByID(corp['info']['ceoID']);
-				var embed = new Discord.RichEmbed()
+				var embed = new Discord.MessageEmbed()
 				    .setTitle(`${corp['info']['name']} - ${corp.info.ticker}`)
 				    .setThumbnail("https://image.eveonline.com/Corporation/" + corp['info']['corporation_id'] + "_256.png")
 				    .setColor(0x673AB7);

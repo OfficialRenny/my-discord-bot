@@ -16,11 +16,11 @@ module.exports = {
 				mentionedUser = message.author;
 			if (mentionedUser.bot)
 				return message.channel.send("That is a bot...");
-			if (!mentionedUser.presence.game)
+			if (!mentionedUser.presence.activity)
 				return message.channel.send("This user is not listening to anything.");
-			if (!mentionedUser.presence.game.details || !mentionedUser.presence.game.state)
+			if (!mentionedUser.presence.activity.details || !mentionedUser.presence.activity.state)
 				return message.channel.send(`Unable to find music for User ${mentionedUser.username}.`);
-			ytSearch(`${mentionedUser.presence.game.details} - ${mentionedUser.presence.game.state}`, opts, function (err, results) {
+			ytSearch(`${mentionedUser.presence.activity.details} - ${mentionedUser.presence.activity.state}`, opts, function (err, results) {
 				if (err)
 					return console.log(err);
 				if (results.length == 0)

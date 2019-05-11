@@ -71,9 +71,9 @@ Client.load = (command) => {
 }
 Client.load();
 
-if (Client.temp.exotics == null) UpdateExoticsVehs();
-if (Client.temp.general == null) UpdateGeneralVehs();
-if (Client.temp.aviations == null) UpdateAviationVehs();
+if (Client.temp.exotics.length == 0) UpdateExoticsVehs();
+if (Client.temp.general.length == 0) UpdateGeneralVehs();
+if (Client.temp.aviations.length == 0) UpdateAviationVehs();
 
 Client.bot.on('ready', async() => {
 	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'mainDb';").get();
@@ -128,7 +128,7 @@ Client.bot.on('ready', async() => {
 	Client.getReminder = sql.prepare("SELECT * FROM reminders WHERE time < ?");
 	Client.setReminder = sql.prepare("INSERT INTO reminders (remind_who, reminder, requested_by, channel, time) VALUES (@remind_who, @reminder, @requested_by, @channel, @time)");
 	
-	userThatIsOnlyReferencedOnce = await Client.bot.fetchUser(adminID[0]);
+	userThatIsOnlyReferencedOnce = await Client.bot.users.fetch(adminID[0]);
 	logger.info('Ready and logged in as ' + Client.bot.user.username + '!');
 	//setInterval(() => {
 	//		Reminders();
@@ -145,7 +145,7 @@ Client.bot.on('ready', async() => {
 Client.bot.on('message', async(message) => {
 	if (message.author.bot)
 		return;
-
+	
 	if (!message.guild) {
 		Client.temp.chatChannel = message.author;
 		Client.temp.chatName = message.author.username;
@@ -155,7 +155,19 @@ Client.bot.on('message', async(message) => {
 		Client.temp.chatChannel = message.guild;
 		Client.temp.chatName = message.guild.name;
 	}
+	
+	// trying to keep vars at the top
 	Client.prefix = Client.getPrefix.get(Client.temp.chatChannel.id);
+	var wordsInMessage = message.content.split(/\s+/g);
+	Client.temp.dbGet = Client.getScore.get(message.author.id);
+	Client.temp.savedTime = Date.now();
+	const splitprefix = Client.prefix.prefix.split(/\s+/g);
+	const args = message.content.split(/\s+/g);
+	for (i = 0; i < splitprefix.length - 1; i++) args.shift();
+	var command = args.shift().slice(splitprefix[splitprefix.length -1].length).toLowerCase();
+	Client.temp.quotedStrings = message.content.match(/(?=["'])(?:"[^"\\]*(?:\\[\s\S][^"\\]*)*"|'[^'\\]*(?:\\[\s\S][^'\\]*)*')/g);
+	
+	
 	if (!Client.prefix) {
 		logger.info(`${Client.temp.chatName} does not yet have a prefix, defaulting to ~.`);
 		message.channel.send(`${Client.temp.chatName} does not yet have a prefix, defaulting to ~.`);
@@ -167,17 +179,10 @@ Client.bot.on('message', async(message) => {
 		logger.info("Done.");
 	}
 	
-	var wordsInMessage = message.content.split(/\s+/g);
-	Client.temp.dbGet = Client.getScore.get(message.author.id);
+	
 	if (!Client.temp.dbGet) {
 		Client.temp.dbGet = F.generateDbEntry(message.author);
 	}
-	Client.temp.savedTime = Date.now();
-	const splitprefix = Client.prefix.prefix.split(/\s+/g);
-	const args = message.content.split(/\s+/g);
-	for (i = 0; i < splitprefix.length - 1; i++) args.shift();
-	var command = args.shift().slice(splitprefix[splitprefix.length -1].length).toLowerCase();
-	Client.temp.quotedStrings = message.content.match(/(?=["'])(?:"[^"\\]*(?:\\[\s\S][^"\\]*)*"|'[^'\\]*(?:\\[\s\S][^'\\]*)*')/g);
 	
 	if (!message.content.startsWith(Client.prefix.prefix)) {
 		let randNum = Math.floor((Math.random() * 10) + 1);

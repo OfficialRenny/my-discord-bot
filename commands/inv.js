@@ -5,7 +5,7 @@ module.exports = {
 	name: 'Inventory',
 	help: 'Check your current inventory.',
 	func: (Client, message, args) => {
-			const embed = new Discord.RichEmbed()
+			const embed = new Discord.MessageEmbed()
 				.setTitle(message.author.username)
 				.setThumbnail(message.author.displayAvatarURL)
 				.setDescription("This is a list of all of your current items.")

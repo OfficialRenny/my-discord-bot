@@ -149,7 +149,7 @@ module.exports = {
 							Client.setScore.run(someoneDBget);
 							vars.logger.info(`User ${message.author.username} gave ${usersToGiveTo[member].username} ${itemsToReceive}x ${vars.listOfStoreItems[i]["name"]}!`);
 						}
-						const embed = new Discord.RichEmbed()
+						const embed = new Discord.MessageEmbed()
 							.setTimestamp()
 							.setDescription(`${message.author.username} has just gifted ${usersToGiveToString} ${itemsToReceive}x ${vars.listOfStoreItems[i]["name"]}!`)
 							.setTitle(`You have a gift!`)

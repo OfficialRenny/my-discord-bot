@@ -19,7 +19,7 @@ module.exports = {
 			dbGet.level = Math.floor(utils.calculateLevel(dbGet.points));
 			const pointsForCurrentLevel = utils.calculatePoints(parseInt(dbGet.level));
 			const pointsForNextLevel = utils.calculatePoints(parseInt(dbGet.level) + 1);
-			const embed = new Discord.RichEmbed()
+			const embed = new Discord.MessageEmbed()
 				.setTimestamp()
 				.setAuthor(usableId.username)
 				.setThumbnail(usableId.displayAvatarURL)

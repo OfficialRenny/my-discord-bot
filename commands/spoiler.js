@@ -26,5 +26,15 @@ module.exports = {
 			});
 			});
 		}
+		
+		if (cmd == "3") {
+			if (args.length < 1) return message.channel.send("That is an empty message.");
+			var str = args.join(' ');
+			var str2 = "";
+			for (i = 0; i < str.length; i++) {
+				str2 += `||${str.charAt(i)}||`;
+			}
+			message.channel.send(`For copying and pasting: \`\`\`\n${str2}\n\`\`\``);
+		}
 	}
 }
