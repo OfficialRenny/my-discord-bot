@@ -8,6 +8,7 @@ const Sugar = require('sugar');
 const sql = new SQLite('./data/db.sqlite');
 const F = require('./utils/functions.js');
 const V = require('./utils/vars.js');
+const ytSearch = require('youtube-search');
 const adminID = ['197376829408018432', '108875959628795904'];
 var userThatIsOnlyReferencedOnce;
 var reminderRegex = /Remind (.+) to (.+) (in|next) (.+)/gi;
@@ -25,10 +26,16 @@ Client = {
 					exotics: null,
 					general: null,
 					aviations: null
-				}
+				},
+				rp2ytSubbed: []
 			}
 }
 Client.temp.sheets = google.sheets({version: 'v4', auth: Client.config.GoogleApiKey});
+
+var opts = {
+	maxResults: 10,
+	key: Client.config.GoogleApiKey
+};
 
 log4js.configure({
 	appenders: {
@@ -231,7 +238,7 @@ Client.bot.on('message', async(message) => {
 				message.channel.startTyping();
 				fileName = F.ariana4mogs(0, Client.temp.chatChannel, message.author, Client.temp.chatChannel);
 				message.channel.send({
-					file: fileName
+					files: [fileName]
 				});
 				message.channel.stopTyping();
 				return;
@@ -240,7 +247,7 @@ Client.bot.on('message', async(message) => {
 				message.channel.startTyping();
 				fileName = F.ariana4mogs(2, Client.temp.chatChannel, message.author, Client.temp.chatChannel);
 				message.channel.send({
-					file: fileName
+					files: [fileName]
 				});
 				message.channel.stopTyping();
 				return;
@@ -249,7 +256,7 @@ Client.bot.on('message', async(message) => {
 				message.channel.startTyping();
 				fileName = F.ariana4mogs(1, Client.temp.chatChannel, message.author, Client.temp.chatChannel);
 				message.channel.send({
-					file: fileName
+					files: [fileName]
 				});
 				message.channel.stopTyping();
 				return;
@@ -265,6 +272,30 @@ Client.bot.on('message', async(message) => {
 		message.channel.send('feels bad man :(')
 	}
 
+});
+
+Client.bot.on('presenceUpdate', (oldPresence, newPresence) => {
+	for (sub of Client.temp.rp2ytSubbed) {
+		if (sub.user.id != newPresence.user.id) continue;
+		if (!newPresence.activity)
+			return;
+		if (!newPresence.activity.details || !newPresence.activity.state)
+			return;
+		if (oldPresence.activity && oldPresence.activity.details == newPresence.activity.details) 
+			return;
+		ytSearch(`${newPresence.activity.details} - ${newPresence.activity.state}`, opts, function (err, results) {
+			if (err) {
+				console.log("Uh oh, error for some user, idc.");
+				return console.log(err);
+			}
+			if (results.length == 0) {
+				console.log("No results found for some user, /shrug.");
+				return;
+			}
+			sub.channel.send(results[0].link);
+			console.log(`User ${newPresence.user.username} was subscribed to rp2yt and is now listening to a song which has the URL of ${results[0].link}`);
+		});
+	}
 });
 
 Client.bot.on('error', (error) => {

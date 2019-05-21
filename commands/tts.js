@@ -25,14 +25,13 @@ module.exports = {
 					break;
 				}
 			default:
-				TTS(Client.bot.voice.connections.filter(voice => voice.channel.guild.id == message.guild.id).first());
+				TTS(message.guild.voice.connection);
 		}
 		
 		async function TTS(connection) {
-			if (connection == null || undefined) return message.channel.send(`Please use \`${Client.prefix.prefix}tts join\` before sending any TTS commands.`);
-			const dispatcher = connection.play(`http://mary.dfki.de:59125/process?INPUT_TEXT=${nickname}%20says%20${encodeURI(args.join(' '))}&INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=en_US`);
+			if (connection == null) return message.channel.send(`Please use \`${Client.prefix.prefix}tts join\` before sending any TTS commands.`);
+			const dispatcher = connection.play(`http://mary.dfki.de:59125/process?INPUT_TEXT=${encodeURI(args.join(' '))}&INPUT_TYPE=TEXT&OUTPUT_TYPE=AUDIO&AUDIO=WAVE_FILE&LOCALE=en_US`);
 			dispatcher.on('debug', (info) => console.log(info));
-			dispatcher.on('end', () => console.log('finished playing'));
 			dispatcher.on('error', (error) => console.log(error));
 		}
 		
