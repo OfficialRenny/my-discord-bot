@@ -1,30 +1,53 @@
 const Discord = require('discord.js');
 const fs = require('fs');
 const {google} = require('googleapis');
-const F = require('../utils/functions.js');
-const V = require('../utils/vars.js');
-var vehsPending = [];
 
 module.exports = {
 	name: 'Dinoco Imports Checker',
 	help: 'Fetches a list of pending Aviation imports.',
 	servers: ['275388903547076610', '256139176225931264'],
-	func: (Client, message, args) => {
-		let txt = "Pending Aviations Requests\n\n";
-		if (Client.temp.aviations.length < 1) return message.channel.send("There are no pending imports");
-		for (veh in Client.temp.aviations) {
-			curVeh = Client.temp.aviations[veh];
-			txt += `${curVeh.charName} (( ${curVeh.forumName} )) requested a ${curVeh.vehicle} at ${curVeh.timestamp}.\n\n`;
-		}
-		var temp = Client.temp.timestamps.aviations;
-		var date = temp.getFullYear()+'-'+(temp.getMonth()+1)+'-'+temp.getDate();
-		var time = temp.getHours() + ":" + temp.getMinutes() + ":" + temp.getSeconds();
-		txt += `Last Updated: ${date} ${time}`;
-		if (txt.length > 2000) {
-			return message.channel.send("There are way too many requests to fit into a single discord message, sort them out!");
-		} else {
-			return message.channel.send(F.codeBlokkit(txt, 'asciidoc'));
-		}
+	func: async (Client, message, args) => {
+		message.channel.send('Be patient, this takes some time....').then((msg) => {
+			try {
+				Client.temp.sheets.spreadsheets.get({
+					spreadsheetId: '1I0pP7DMrV_QprEWmnJrhMPEonQ4Ky3a7Plv_SBsyrfY',
+					ranges: 'FORM RESPONSES!A2:K300',
+					includeGridData: true
+				}, (err, res) => {
+					if (err) {
+						console.log('The API returned an error: ' + err);
+						return msg.edit("There was some error...");
+					}
+					const rows = res.data.sheets[0].data[0].rowData;
+					if (rows) {
+						i = 0;
+						let txt = "Pending Aviations Imports:\n";
+						for (var r in rows) {
+							curRow = rows[r].values;
+							if (!(curRow[0].effectiveValue)) continue;
+							cellColor = curRow[0].effectiveFormat.backgroundColor;
+							if (!(cellColor.red == 1 && cellColor.green == 1 && cellColor.blue == 1)) continue;
+							let timestamp = curRow[0].formattedValue;
+							let charName = curRow[1].formattedValue;
+							let forumName = curRow[3].formattedValue;
+							let vehicle = curRow[7].formattedValue;
+							let vehLink = curRow[6].formattedValue;
+							txt += `${charName} (( ${forumName} )) requested a ${vehicle} at ${timestamp}.\n\n`;
+							i++;
+						}
+						if (i < 1) {
+							msg.edit('There are currently no pending Aviations requests.');
+						} else {
+							msg.edit('```' + txt + '```');
+						}
+					} else {
+						msg.edit("Something fucked up, send the commands again.");
+					}
+				});
+			} catch (e) {
+				msg.edit('There was some error.');
+			}
+		});
 	}
 }
 

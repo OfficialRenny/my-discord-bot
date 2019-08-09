@@ -11,15 +11,19 @@ module.exports = {
 	name: 'Rich Presence to YouTube',
 	help: 'Converts whatever you\'re listening to through something like Spotify into a YouTube link.',
 	func: (Client, message, args) => {
-		if (!args[0]) args[0] = message.author;
+		if (!args[0]) args[0] = 'yote this is just for a test';
 		switch (args[0].toLowerCase()) {
 			case 'subscribe':
+			case 'sub':
+			case '+':
 				subscribe();
-				console.log(Client.temp.rp2ytSubbed);
+				//console.log(Client.temp.rp2ytSubbed);
 				break;
 			case 'unsubscribe':
+			case 'unsub':
+			case '-':
 				unsubscribe();
-				console.log(Client.temp.rp2ytSubbed);
+				//console.log(Client.temp.rp2ytSubbed);
 				break;
 			default:
 				rp2yt();
@@ -46,6 +50,7 @@ module.exports = {
 		function Subscription(user, channel) {
 			this.user = user;
 			this.channel = channel;
+			this.songs = [];
 		}
 			
 		function rp2yt() {

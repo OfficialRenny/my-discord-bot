@@ -14,6 +14,10 @@ var userThatIsOnlyReferencedOnce;
 var reminderRegex = /Remind (.+) to (.+) (in|next) (.+)/gi;
 const {google} = require('googleapis');
 
+//server stuff for an "api"
+var express = require('express');
+
+
 Client = {
     config: require('./data/config.json'),
     bot: _b,
@@ -77,10 +81,6 @@ Client.load = (command) => {
     }
 }
 Client.load();
-
-if (Client.temp.exotics.length == 0) UpdateExoticsVehs();
-if (Client.temp.general.length == 0) UpdateGeneralVehs();
-if (Client.temp.aviations.length == 0) UpdateAviationVehs();
 
 Client.bot.on('ready', async() => {
 	var table = sql.prepare("SELECT count(*) FROM sqlite_master WHERE type='table' AND name = 'mainDb';").get();
@@ -149,6 +149,23 @@ Client.bot.on('ready', async() => {
 
 });
 
+const app = express();
+app.use(express.json());
+const server = app.listen(1070, () => {
+	console.log(`Express running on Port ${server.address().port}`);
+});
+//app.post('/', (req, res) => {
+	//console.log("Got a message from Dollarr");
+	//let keys = Object.keys(req.body);
+	//let embed = new Discord.MessageEmbed()
+		//.setTitle('New Ping from Dollarr')
+		//.setColor(0x212121)
+		//.setURL('https://dollarr.renny.gq');
+	//for (key of keys) embed.addField(key, req.body[key]);
+	//userThatIsOnlyReferencedOnce.send({ embed: embed }).then(res.set("Connection", "close"));
+//});
+
+
 Client.bot.on('message', async(message) => {
 	if (message.author.bot)
 		return;
@@ -158,7 +175,7 @@ Client.bot.on('message', async(message) => {
 		Client.temp.chatName = message.author.username;
 		if (message.author.id != userThatIsOnlyReferencedOnce.id && message.mentions.users.array().includes(userThatIsOnlyReferencedOnce)) userThatIsOnlyReferencedOnce.send(`DM from ${chatName} - ${message.content}`);
 	} else {
-		F.fuckWithMax(message);
+		//F.fuckWithMax(message);
 		Client.temp.chatChannel = message.guild;
 		Client.temp.chatName = message.guild.name;
 	}
@@ -275,14 +292,16 @@ Client.bot.on('message', async(message) => {
 });
 
 Client.bot.on('presenceUpdate', (oldPresence, newPresence) => {
-	for (sub of Client.temp.rp2ytSubbed) {
-		if (sub.user.id != newPresence.user.id) continue;
+	let subbedUsers = Client.temp.rp2ytSubbed.filter(sub => sub.user.id == newPresence.user.id);
+	if (subbedUsers.length > 0) console.log("Found " + subbedUsers.length + " subscribed user(s).");
+	for (sub of subbedUsers) {
 		if (!newPresence.activity)
 			return;
 		if (!newPresence.activity.details || !newPresence.activity.state)
 			return;
 		if (oldPresence.activity && oldPresence.activity.details == newPresence.activity.details) 
 			return;
+		if (sub.timeout) clearTimeout(sub.timeout);
 		ytSearch(`${newPresence.activity.details} - ${newPresence.activity.state}`, opts, function (err, results) {
 			if (err) {
 				console.log("Uh oh, error for some user, idc.");
@@ -292,11 +311,20 @@ Client.bot.on('presenceUpdate', (oldPresence, newPresence) => {
 				console.log("No results found for some user, /shrug.");
 				return;
 			}
-			sub.channel.send(results[0].link);
-			console.log(`User ${newPresence.user.username} was subscribed to rp2yt and is now listening to a song which has the URL of ${results[0].link}`);
+			if (sub.songs.includes(results[0].link)) {
+				return;
+			} else {
+				sub.timeout = setTimeout(() => { SendRP2YTMessage(sub, results[0].link); }, 2500);
+				sub.songs.push(results[0].link);
+			}
 		});
 	}
 });
+
+function SendRP2YTMessage(sub, link) {
+	sub.channel.send(`${sub.user.username} is now listening to: ${link}`);
+	console.log(`User ${sub.user.username} was subscribed to rp2yt and is now listening to a song which has the URL of ${link}`);
+}
 
 Client.bot.on('error', (error) => {
 	logger.error(error.message);
@@ -305,7 +333,7 @@ Client.bot.on('error', (error) => {
 function Reminders() {
 	let reminders = Client.getReminder.get(Date.now());
 	console.log(reminders);
-	sql.prepare(`DELETE FROM reminders WHERE id = ${reminders.id}`);
+	sql.prepare(`DELETE FROM reminders WHERE id = ${reminders.id}`).run();
 	//for (var reminder in reminders) {
 		//curRem = reminders[reminder];
 		//id, remind_who, reminder, requested_by, channel, time
@@ -315,108 +343,5 @@ function Reminders() {
 		//	.catch((err) => logger.error(err));
 	//}
 }
-
-function Vehicle(timestamp, charName, forumName, vehicle, vehLink) {
-	this.timestamp = timestamp;
-	this.charName = charName;
-	this.forumName = forumName;
-	this.vehicle = vehicle;
-	this.vehLink = vehLink;
-}
-
-function UpdateExoticsVehs() {
-	Client.temp.sheets.spreadsheets.get({
-		spreadsheetId: '1pDAGbdSjALnWs2l2CSOjRxliatNHiaIAxTPjYl1iSzI',
-		ranges: 'Responses',
-		includeGridData: true
-	}, (err, res) => {
-		if (err) {
-			return console.log('The API returned an error: ' + err);
-		}
-		const rows = res.data.sheets[0].data[0].rowData;
-		if (rows) {
-			let tempArr = [];
-			for (var r in rows) {
-				curRow = rows[r].values;
-				if (!(curRow[0].effectiveValue)) continue;
-				cellColor = curRow[0].effectiveFormat.backgroundColor;
-				if (!(cellColor.red == 1 && cellColor.green == 1 && cellColor.blue == 1)) continue;
-				//console.log(curRow);
-				let timestamp = curRow[0].formattedValue;
-				let charName = curRow[1].formattedValue;
-				let forumName = curRow[3].formattedValue;
-				let vehicle = curRow[7].formattedValue;
-				let vehLink = curRow[6].formattedValue;
-				tempArr.push(new Vehicle(timestamp, charName, forumName, vehicle, vehLink));
-			}
-			Client.temp.exotics = tempArr;
-			Client.temp.timestamps.exotics = new Date();
-		}
-	});
-}
-
-function UpdateGeneralVehs() {
-	Client.temp.sheets.spreadsheets.get({
-		spreadsheetId: '1__oeLjgRicHRb8WKPxJe6tgU6dMHotPXfc-M7InAi80',
-		ranges: 'Responses!A1000:M2253',
-		includeGridData: true
-	}, (err, res) => {
-		if (err) {
-			return console.log('The API returned an error: ' + err);
-		}
-		const rows = res.data.sheets[0].data[0].rowData;
-		if (rows) {
-			let tempArr = [];
-			for (var r in rows) {
-				curRow = rows[r].values;
-				if (!(curRow[0].effectiveValue)) continue;
-				cellColor = curRow[0].effectiveFormat.backgroundColor;
-				if (!(cellColor.red == 1 && cellColor.green == 1 && cellColor.blue == 1)) continue;
-				let timestamp = curRow[0].formattedValue;
-				let charName = curRow[1].formattedValue;
-				let forumName = curRow[2].formattedValue;
-				let vehicle = curRow[7].formattedValue;
-				let vehLink = curRow[6].formattedValue;
-				tempArr.push(new Vehicle(timestamp, charName, forumName, vehicle, vehLink));
-			}
-			Client.temp.general = tempArr;
-			Client.temp.timestamps.general = new Date();
-		}
-	});
-}
-
-function UpdateAviationVehs() {
-	Client.temp.sheets.spreadsheets.get({
-		spreadsheetId: '1I0pP7DMrV_QprEWmnJrhMPEonQ4Ky3a7Plv_SBsyrfY',
-		ranges: 'FORM RESPONSES!A2:K300',
-		includeGridData: true
-	}, (err, res) => {
-		if (err) {
-			return console.log('The API returned an error: ' + err);
-		}
-		const rows = res.data.sheets[0].data[0].rowData;
-		if (rows) {
-			let tempArr = [];
-			for (var r in rows) {
-				curRow = rows[r].values;
-				if (!(curRow[0].effectiveValue)) continue;
-				cellColor = curRow[0].effectiveFormat.backgroundColor;
-				if (!(cellColor.red == 1 && cellColor.green == 1 && cellColor.blue == 1)) continue;
-				let timestamp = curRow[0].formattedValue;
-				let charName = curRow[1].formattedValue;
-				let forumName = curRow[3].formattedValue;
-				let vehicle = curRow[7].formattedValue;
-				let vehLink = curRow[6].formattedValue;
-				tempArr.push(new Vehicle(timestamp, charName, forumName, vehicle, vehLink));
-			}
-			Client.temp.general = tempArr;
-			Client.temp.timestamps.aviations = new Date();
-		}
-	});
-}
-
-setInterval(UpdateExoticsVehs, 1000 * 60 * 60);
-setInterval(UpdateGeneralVehs, 1000 * 55 * 60);
-setInterval(UpdateAviationVehs, 1000 * 65 * 60);
 
 Client.bot.login(Client.config.token);
