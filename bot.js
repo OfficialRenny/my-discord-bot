@@ -285,7 +285,7 @@ Client.bot.on('message', async(message) => {
 		message.channel.send('The greater good.');
 		}
 
-	if (message.content.toLowerCase().startsWith('>tfw') || message.content.toLowerCase().startsWith('tfw')) {
+	if (message.content.toLowerCase().startsWith('>tfw')) {
 		message.channel.send('feels bad man :(')
 	}
 

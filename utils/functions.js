@@ -1,5 +1,6 @@
 const fs = require('fs');
 const log4js = require('log4js');
+var V = require('./vars.js');
 log4js.configure({
 	appenders: {
 		consoleLogs: {
@@ -33,10 +34,9 @@ module.exports.generateDbEntry = (usableId) => {
 		level: 1,
 		currency: 0,
 		total_messages_sent: 0,
-		discord_silver: 0,
-		rick_roll: 0,
-		manning_face: 0,
-		discord_gold: 0
+	}
+	for (i = 0; i < V.listOfStoreItems.length; i++) {
+		returnedDb[V.listofStoreItems[i].dbname] = 0;
 	}
 	logger.info("Should have created a DB entry for user " + usableId.username);
 	return returnedDb;
