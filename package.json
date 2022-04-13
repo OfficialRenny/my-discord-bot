@@ -9,7 +9,7 @@
 	"author": "Renny",
 	"license": "ISC",
 	"dependencies": {
-		"async": "^3.1.0",
+		"async": "^3.2.2",
 		"better-sqlite-pool": "^0.2.2",
 		"better-sqlite3": "^5.4.3",
 		"discord.js": "github:discordjs/discord.js",
